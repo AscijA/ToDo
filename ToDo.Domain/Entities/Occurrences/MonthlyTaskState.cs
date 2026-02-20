@@ -1,11 +1,10 @@
-﻿
-namespace ToDo.Domain.Entities.Occurences;
+﻿namespace ToDo.Domain.Entities.Occurrences;
 
-public class WeeklyTaskState : EntityBase {
+public class MonthlyTaskState : EntityBase {
     public Guid TaskDefinitionId { get; set; }
     public TaskDefinition TaskDefinition { get; set; } = null!;
 
-    public string WeekKey { get; set; } = string.Empty;
+    public string MonthKey { get; set; } = string.Empty;
 
     public DateTimeOffset? CompletedAtUtc { get; set; }
 

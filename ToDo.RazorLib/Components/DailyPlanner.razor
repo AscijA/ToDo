@@ -1,0 +1,14 @@
+﻿<div class="title">
+   <button class="iconBtn" aria-label="Previous">&lt;</button>
+   <span>@Date.ToString("dddd, dd.MM.yyyy")</span>
+   <button class="iconBtn" aria-label="Next">&gt;</button>
+   <button class="iconBtn" aria-label="Select">📅</button>
+
+</div>
+
+
+@code {
+
+   [Parameter]
+   public DateOnly Date { get; set; } = DateOnly.FromDateTime(DateTime.Now);
+}

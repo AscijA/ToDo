@@ -1,4 +1,4 @@
-﻿using ToDo.Domain.Entities.Occurences;
+﻿using ToDo.Domain.Entities.Occurrences;
 
 namespace ToDo.Domain.Entities;
 

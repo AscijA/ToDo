@@ -1,6 +1,6 @@
 ﻿using ToDo.Domain.Entities;
 
-namespace ToDo.Domain.Entities.Occurences;
+namespace ToDo.Domain.Entities.Occurrences;
 
 public class DailyOccurrence : EntityBase {
     // Foreign keys

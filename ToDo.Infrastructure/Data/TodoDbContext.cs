@@ -1,6 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using ToDo.Domain.Entities;
-using ToDo.Domain.Entities.Occurences;
+using ToDo.Domain.Entities.Occurrences;
 
 namespace ToDo.Infrastructure.Data;
 

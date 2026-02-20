@@ -1,0 +1,24 @@
+﻿@page "/"
+@using ToDo.RazorLib.Components
+
+<PageTitle>Planner Dashboard</PageTitle>
+
+<div class="planner-dashboard">
+   <aside class="sidebar" aria-label="Primary">
+      <div class="sidebarSpacer"></div>
+      <button class="iconBtn" aria-label="History">📅</button>
+      <button class="iconBtn" aria-label="New">➕</button>
+   </aside>
+
+   <div class="panel-daily">
+      <DailyPlanner />
+   </div>
+
+   <div class="panel-weekly">
+      <WeeklyPlanner />
+   </div>
+
+   <div class="panel-monthly">
+      <MonthlyPlanner />
+   </div>
+</div>
