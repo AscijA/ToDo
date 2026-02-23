@@ -4,13 +4,17 @@ using ToDo.Infrastructure.Data;
 namespace ToDo.Maui.Services;
 
 public class DatabaseInitializer {
-    private readonly TodoDbContext _context;
+    private readonly IDbContextFactory<TodoDbContext> _contextFactory;
 
-    public DatabaseInitializer(TodoDbContext context) {
-        _context = context;
+    public DatabaseInitializer(IDbContextFactory<TodoDbContext> contextFactory) {
+        _contextFactory = contextFactory;
     }
 
     public async Task InitializeAsync() {
-        await _context.Database.MigrateAsync();
+        using var context = await _contextFactory.CreateDbContextAsync();
+
+        //await context.Database.EnsureDeletedAsync();
+
+        await context.Database.EnsureCreatedAsync();
     }
 }

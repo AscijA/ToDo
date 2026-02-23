@@ -13,6 +13,13 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.0.2" />
+    <PackageReference Include="MudBlazor" Version="9.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ToDo.Application\ToDo.Application.csproj" />
+    <ProjectReference Include="..\ToDo.Domain\ToDo.Domain.csproj" />
+    <ProjectReference Include="..\ToDo.Infrastructure\ToDo.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

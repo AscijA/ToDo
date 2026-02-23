@@ -1,0 +1,90 @@
+﻿@using System.ComponentModel.DataAnnotations
+@using System.Diagnostics
+@using ToDo.Application.Interfaces.Services
+@inject ISnackbar Snackbar
+@inject ITaskService TaskService
+
+<MudForm Model="@Daily" @ref="itemForm">
+	<div class="d-flex align-center gap-4">
+		<MudCheckBox @bind-Value="Daily.IsDone"
+						 @bind-Value:after="SaveChanges"
+						 Color="Color.Primary"
+						 Dense="true"
+						 Size="Size.Small" />
+
+		<MudTextField @bind-Value="Daily.Timeslot"
+						  @bind-Value:after="SaveChanges"
+						  For="@(() => Daily.Timeslot)"
+						  Label=""
+						  Placeholder="09:00-11:00"
+						  Class="timeslot flex-grow-0 "
+						  Mask="@timeSlotMask"
+						  Margin="Margin.Dense"
+						  Underline="false" />
+
+		<MudTextField @bind-Value="Daily.Title"
+						  @bind-Value:after="SaveChanges"
+						  For="@(() => Daily.Title)"
+						  Label=""
+						  Margin="Margin.Dense"
+						  Underline="string.IsNullOrWhiteSpace(Daily.Title)" />
+
+		<MudIconButton Icon="@Icons.Material.Filled.Info"
+							aria-label="Description"
+							Color="Color.Primary"
+							Size="Size.Medium"
+							OnClick="OnExpandCollapseClick" />
+	</div>
+	<MudCollapse Expanded="_expanded">
+		<MudTextField @bind-Value="Daily.Description"
+						  @bind-Value:after="SaveChanges"
+						  For="@(() => Daily.Description)"
+						  Margin="Margin.Dense" />
+
+	</MudCollapse>
+
+</MudForm>
+
+@code {
+	private MudForm itemForm;
+	private IMask timeSlotMask = new PatternMask("00:00-00:00");
+	[Parameter]
+	public DailyItemDTO Daily { get; set; } = new();
+
+	[Parameter]
+	public DateOnly date { get; set; } = DateOnly.FromDateTime(DateTime.Now);
+
+	private async Task SaveChanges() {
+		if (!string.IsNullOrEmpty(Daily.Timeslot) && Daily.Timeslot.Length < 11) {
+			Debug.WriteLine("Timeslot is incomplete. Aborting auto-save.");
+			return;
+		}
+		var validationContext = new ValidationContext(Daily);
+		var validationResults = new List<ValidationResult>();
+
+		bool isModelSafeToSave = Validator.TryValidateObject(Daily, validationContext, validationResults, validateAllProperties: true);
+
+		if (isModelSafeToSave) {
+			try {
+				if (Daily.TaskDefinitionId == Guid.Empty) {
+					Debug.WriteLine("Insert New");
+					await TaskService.AddTaskToDateAsync(date, Daily);
+					return;
+				}
+				await TaskService.UpdateAsync(Daily);
+			}
+			catch (Exception ex) {
+				Debug.WriteLine($"Failed to save: {ex.Message}");
+				Snackbar.Add("Error saving data", Severity.Error);
+			}
+		}
+		else {
+			Debug.WriteLine("Silent validation failed. Waiting for valid data to save...");
+		}
+	}
+	bool _expanded = false;
+
+	private void OnExpandCollapseClick() {
+		_expanded = !_expanded;
+	}
+}

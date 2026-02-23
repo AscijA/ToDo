@@ -8,9 +8,10 @@
 
   <ItemGroup>
     <Folder Include="Exceptions\" />
-    <Folder Include="Interfaces\UnitOfWork\" />
-    <Folder Include="Interfaces\Repositories\" />
-    <Folder Include="Mappings\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ToDo.Infrastructure\ToDo.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

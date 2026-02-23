@@ -1,14 +1,30 @@
-﻿<div class="title">
-   <button class="iconBtn" aria-label="Previous">&lt;</button>
-   <span>@Date.ToString("dddd, dd.MM.yyyy")</span>
-   <button class="iconBtn" aria-label="Next">&gt;</button>
-   <button class="iconBtn" aria-label="Select">📅</button>
+﻿@inject ITaskService TaskService
+@using ToDo.Application.Interfaces.Services
+@using ToDo.RazorLib.Components.Common
+
+<div class="title">
+	<MudIconButton Icon="@Icons.Material.Filled.NavigateBefore" aria-label="Previous" Color="Color.Primary" Size="Size.Medium" />
+
+	<span class="title-date">@Date.ToString("dddd, dd.MM.yyyy")</span>
+	<MudIconButton Icon="@Icons.Material.Filled.NavigateNext" aria-label="Next" Color="Color.Primary" Size="Size.Medium" />
+
+	<MudIconButton Icon="@Icons.Material.Filled.CalendarMonth" aria-label="Select" Color="Color.Primary" Size="Size.Medium" />
 
 </div>
+@for (int i = 0; i<DailyItems.Count; i++) {
 
+	<DailyItem Daily=DailyItems[i] />
+}
 
 @code {
 
-   [Parameter]
-   public DateOnly Date { get; set; } = DateOnly.FromDateTime(DateTime.Now);
+	public DateOnly Date { get; set; } = DateOnly.FromDateTime(DateTime.Now);
+
+	public List<DailyItemDTO> DailyItems { get; set; } = new List<DailyItemDTO>();
+
+	protected override async Task OnInitializedAsync() {
+		base.OnInitialized();
+
+		DailyItems = await TaskService.GetAllDailyOfDateAsync(Date);
+	}
 }

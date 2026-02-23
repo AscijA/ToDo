@@ -18,12 +18,4 @@ public class TodoDbContext : DbContext {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(TodoDbContext).Assembly);
     }
 
-    public override int SaveChanges() {
-        return base.SaveChanges();
-    }
-
-    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) {
-        return base.SaveChangesAsync(cancellationToken);
-    }
-
 }

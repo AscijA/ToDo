@@ -10,15 +10,10 @@ public class DailyOccurrence : EntityBase {
     public Guid TaskDefinitionId { get; set; }
     public TaskDefinition TaskDefinition { get; set; } = null!;
 
-    public int? StartMinutes { get; set; }
-    public int? EndMinutes { get; set; }
-
-    public DateTimeOffset? DoneAtUtc { get; set; }
-
+    public string? Timeslot { get; set; } 
+    public bool IsDone { get; set; }
     public int SortOrder { get; set; }
 
-    public bool IsDone => DoneAtUtc != null;
+    public DailyOccurrence() { }
 
-    public TimeOnly? StartTime => StartMinutes is null ? null : TimeOnly.FromTimeSpan(TimeSpan.FromMinutes(StartMinutes.Value));
-    public TimeOnly? EndTime => EndMinutes is null ? null : TimeOnly.FromTimeSpan(TimeSpan.FromMinutes(EndMinutes.Value));
 }

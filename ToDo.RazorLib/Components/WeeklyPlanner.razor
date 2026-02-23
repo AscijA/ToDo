@@ -1,7 +1,9 @@
-﻿<h6>@Week</h6>
+﻿@using ToDo.RazorLib.Components.Common
+<h6>@Week</h6>
+<DailyItem Daily=@new() />
 
 
 @code {
-   [Parameter]
-   public string Week { get; set; }
+	[Parameter]
+	public string Week { get; set; }
 }

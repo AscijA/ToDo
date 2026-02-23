@@ -1,24 +1,47 @@
 ﻿@page "/"
+@using Microsoft.AspNetCore.Components.Web
 @using ToDo.RazorLib.Components
-
+<MudThemeProvider Theme="ODPTheme.Theme"
+                  IsDarkMode="true"
+                  ObserveSystemDarkModeChange="false" />
+<MudDialogProvider />
+<MudSnackbarProvider />
+<MudPopoverProvider />
 <PageTitle>Planner Dashboard</PageTitle>
 
 <div class="planner-dashboard">
    <aside class="sidebar" aria-label="Primary">
-      <div class="sidebarSpacer"></div>
-      <button class="iconBtn" aria-label="History">📅</button>
-      <button class="iconBtn" aria-label="New">➕</button>
+      <div class="sidebar-spacer"></div>
+      <MudIconButton Icon="@Icons.Material.Filled.Add" aria-label="New" Color="Color.Primary" />
    </aside>
 
-   <div class="panel-daily">
-      <DailyPlanner />
-   </div>
+   <MudSplitPanel @ref="_splitPanel"
+                  Class="split-container mud-width-full mud-height-full"
+                  Horizontal="false"
+                  Rounded="true"
+                  Elevation="0"
+                  ClassFirstPanel="rounded-lg"
+                  ClassSecondPanel="rounded-lg">
+      <FirstPanel>
+         <MudPaper Class="panel-daily mud-height-full" Elevation="1">
+            <DailyPlanner />
+         </MudPaper>
+      </FirstPanel>
 
-   <div class="panel-weekly">
-      <WeeklyPlanner />
-   </div>
+      <SecondPanel>
+         <MudStack StretchItems="StretchItems.All" Class="mud-height-full" Spacing="2">
+            <MudPaper Class="panel-weekly" Elevation="1">
+               <WeeklyPlanner />
+            </MudPaper>
 
-   <div class="panel-monthly">
-      <MonthlyPlanner />
-   </div>
+            <MudPaper Class="panel-monthly" Elevation="1">
+               <MonthlyPlanner />
+            </MudPaper>
+         </MudStack>
+      </SecondPanel>
+   </MudSplitPanel>
 </div>
+
+@code {
+	private MudSplitPanel _splitPanel;
+}
