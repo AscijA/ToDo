@@ -1,10 +1,10 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using MudBlazor.Services;
 using ToDo.Application.Interfaces.Services;
 using ToDo.Application.Services;
 using ToDo.Infrastructure.Data;
 using ToDo.Maui.Services;
+using ToDo.RazorLib.Services;
 
 namespace ToDo.Maui;
 
@@ -30,7 +30,7 @@ public static class MauiProgram {
 
         builder.Services.AddSingleton<DatabaseInitializer>();
         builder.Services.AddTransient<ITaskService, TaskService>();
-
+        builder.Services.AddSingleton<ISettingsService, MauiSettingsService>();
         return builder.Build();
     }
 }

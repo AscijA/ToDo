@@ -1,5 +1,4 @@
 ﻿@page "/"
-@using Microsoft.AspNetCore.Components.Web
 @using ToDo.RazorLib.Components
 <MudThemeProvider Theme="ODPTheme.Theme"
                   IsDarkMode="true"
@@ -20,21 +19,20 @@
                   Horizontal="false"
                   Rounded="true"
                   Elevation="0"
-                  ClassFirstPanel="rounded-lg"
-                  ClassSecondPanel="rounded-lg">
+                  >
       <FirstPanel>
-         <MudPaper Class="panel-daily mud-height-full" Elevation="1">
+         <MudPaper Class="panel-daily mud-height-full rounded" Elevation="1">
             <DailyPlanner />
          </MudPaper>
       </FirstPanel>
 
       <SecondPanel>
-         <MudStack StretchItems="StretchItems.All" Class="mud-height-full" Spacing="2">
-            <MudPaper Class="panel-weekly" Elevation="1">
+         <MudStack StretchItems="StretchItems.All" Class="rounded mud-height-full" Spacing="2">
+            <MudPaper Class="panel-weekly rounded" Elevation="1">
                <WeeklyPlanner />
             </MudPaper>
 
-            <MudPaper Class="panel-monthly" Elevation="1">
+            <MudPaper Class="panel-monthly rounded" Elevation="1">
                <MonthlyPlanner />
             </MudPaper>
          </MudStack>
@@ -43,5 +41,5 @@
 </div>
 
 @code {
-	private MudSplitPanel _splitPanel;
+	private MudSplitPanel? _splitPanel;
 }
