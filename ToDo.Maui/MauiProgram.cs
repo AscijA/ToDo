@@ -27,7 +27,7 @@ public static class MauiProgram {
 
         builder.Services.AddDbContextFactory<TodoDbContext>(options =>
              options.UseSqlite($"Data Source={dbPath}"));
-
+        //System.Diagnostics.Debug.WriteLine($"Database path: {dbPath}");
         builder.Services.AddSingleton<DatabaseInitializer>();
         builder.Services.AddTransient<ITaskService, TaskService>();
         builder.Services.AddSingleton<ISettingsService, MauiSettingsService>();

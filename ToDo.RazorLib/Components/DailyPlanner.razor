@@ -3,85 +3,95 @@
 @using ToDo.RazorLib.Components.Common
 
 <div class="title">
-   <MudIconButton Icon="@Icons.Material.Filled.NavigateBefore" aria-label="Previous" Color="Color.Primary" Size="Size.Medium" OnClick="GoToPreviousDay" />
+	<MudIconButton Icon="@Icons.Material.Filled.NavigateBefore" aria-label="Previous" Color="Color.Primary" Size="Size.Medium" OnClick="GoToPreviousDay" />
 
-   <span class="title-date" onclick="@(async () => { await OnDateSelected(DateTime.Now); })">@Date.ToString("dddd, dd.MM.yyyy")</span>
-   <MudIconButton Icon="@Icons.Material.Filled.NavigateNext" aria-label="Next" Color="Color.Primary" Size="Size.Medium" OnClick="GoToNextDay" />
+	<span class="title-date" onclick="@(async () => { await OnDateSelected(DateTime.Now); })">@Date.ToString("dddd, dd.MM.yyyy")</span>
+	<MudIconButton Icon="@Icons.Material.Filled.NavigateNext" aria-label="Next" Color="Color.Primary" Size="Size.Medium" OnClick="GoToNextDay" />
 
-   <MudMenu Icon="@Icons.Material.Filled.CalendarMonth" Color="Color.Primary" AnchorOrigin="Origin.BottomCenter" TransformOrigin="Origin.TopCenter">
-      <MudDatePicker PickerVariant="PickerVariant.Static"
-                     Date="selectedDateTime"
-                     DateChanged="OnDateSelected"
-                     AutoClose="true"
-                     ShowWeekNumbers="true"
-                     ShowToolbar="false" />
-   </MudMenu>
+	<MudMenu Icon="@Icons.Material.Filled.CalendarMonth" Color="Color.Primary" AnchorOrigin="Origin.BottomCenter" TransformOrigin="Origin.TopCenter">
+		<MudDatePicker PickerVariant="PickerVariant.Static"
+							Date="selectedDateTime"
+							DateChanged="OnDateSelected"
+							AutoClose="true"
+							ShowWeekNumbers="true"
+							ShowToolbar="false" />
+	</MudMenu>
 </div>
 @foreach (var item in DailyItems) {
-   <DailyItem @key="item.TaskDefinitionId"
-              Daily="item"
-              date="Date"
-              OnSaved="RefreshListAsync"
-              />
+	<DailyItem @key="item.TaskDefinitionId"
+				  Daily="item"
+				  date="Date"
+				  OnSaved="RefreshListAsync" />
 }
 
-<DailyItem Daily="newItem" date="Date" OnSaved="RefreshListAsync" @key="Guid.NewGuid()"/>
+<DailyItem Daily="newItem"
+			  date="Date"
+			  OnSaved="RefreshListAsync"
+			  @key="Guid.NewGuid()"
+			  AutoFocus="shouldAutoFocus" />
 
 @code {
-   private DailyItemDTO newItem = new();
+	private DailyItemDTO newItem = new();
 
-   private const string DatePrefKey = "LastViewedPlannerDate";
-   public DateOnly Date { get; set; }
-   public List<DailyItemDTO> DailyItems { get; set; } = new();
+	private const string DatePrefKey = "LastViewedPlannerDate";
+	public DateOnly Date { get; set; }
+	public List<DailyItemDTO> DailyItems { get; set; } = new();
 
-   private DateTime selectedDateTime;
+	private DateTime selectedDateTime;
 
-   protected override async Task OnInitializedAsync() {
-      string savedDateStr = SettingsService.Get(DatePrefKey, string.Empty);
+	private bool shouldAutoFocus = false;
 
-      if (!string.IsNullOrEmpty(savedDateStr) && DateOnly.TryParse(savedDateStr, out var parsedDate)) {
-         Date = parsedDate;
-      }
-      else {
-         Date = DateOnly.FromDateTime(DateTime.Now);
-      }
+	protected override async Task OnInitializedAsync() {
+		// string savedDateStr = SettingsService.Get(DatePrefKey, string.Empty);
 
-      selectedDateTime = Date.ToDateTime(new TimeOnly(0, 0));
+		// if (!string.IsNullOrEmpty(savedDateStr) && DateOnly.TryParse(savedDateStr, out var parsedDate)) {
+		//    Date = parsedDate;
+		// }
+		// else {
+		Date = DateOnly.FromDateTime(DateTime.Now);
+		// }
 
-      await LoadTasksAsync();
-   }
+		selectedDateTime = Date.ToDateTime(new TimeOnly(0, 0));
 
-   private async Task LoadTasksAsync() {
-      DailyItems = await TaskService.GetAllDailyOfDateAsync(Date);
-      newItem = new DailyItemDTO();
-   }
-   private async Task RefreshListAsync() {
-      await LoadTasksAsync();
-   }
+		await LoadTasksAsync();
+	}
 
-   private async Task GoToPreviousDay() {
-      Date = Date.AddDays(-1);
-      await SyncAndReloadAsync();
-   }
 
-   private async Task GoToNextDay() {
-      Date = Date.AddDays(1);
-      await SyncAndReloadAsync();
-   }
+	private async Task LoadTasksAsync() {
+		DailyItems = await TaskService.GetAllDailyOfDateAsync(Date);
+		newItem = new DailyItemDTO();
+	}
+	private async Task RefreshListAsync() {
+		shouldAutoFocus = true;
+		await LoadTasksAsync();
+	}
 
-   private async Task OnDateSelected(DateTime? newDate) {
-      if (newDate.HasValue) {
-         Date = DateOnly.FromDateTime(newDate.Value);
-         selectedDateTime = newDate.Value;
-         await SyncAndReloadAsync();
-      }
-   }
+	private async Task GoToPreviousDay() {
+		Date = Date.AddDays(-1);
+		await SyncAndReloadAsync();
+	}
 
-   private async Task SyncAndReloadAsync() {
-      selectedDateTime = Date.ToDateTime(new TimeOnly(0, 0));
+	private async Task GoToNextDay() {
+		Date = Date.AddDays(1);
+		await SyncAndReloadAsync();
+	}
 
-      SettingsService.Set(DatePrefKey, Date.ToString("yyyy-MM-dd"));
+	private async Task OnDateSelected(DateTime? newDate) {
+		if (newDate.HasValue) {
+			Date = DateOnly.FromDateTime(newDate.Value);
+			selectedDateTime = newDate.Value;
+			await SyncAndReloadAsync();
+		}
+	}
 
-      await LoadTasksAsync();
-   }
+	private async Task SyncAndReloadAsync() {
+		shouldAutoFocus = false;
+		selectedDateTime = Date.ToDateTime(new TimeOnly(0, 0));
+
+		SettingsService.Set(DatePrefKey, Date.ToString("yyyy-MM-dd"));
+
+		await LoadTasksAsync();
+	}
+
+
 }

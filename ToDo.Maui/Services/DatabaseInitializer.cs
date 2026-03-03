@@ -13,7 +13,7 @@ public class DatabaseInitializer {
     public async Task InitializeAsync() {
         using var context = await _contextFactory.CreateDbContextAsync();
 
-        await context.Database.EnsureDeletedAsync();
+        //await context.Database.EnsureDeletedAsync();
 
         await context.Database.EnsureCreatedAsync();
     }

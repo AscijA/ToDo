@@ -1,100 +1,127 @@
 ﻿@inject ISnackbar Snackbar
 @inject ITaskService TaskService
 
-<MudForm Model="@Daily" @ref="itemForm">
-   <div class="d-flex align-center gap-4">
-      <MudCheckBox @bind-Value="Daily.IsDone"
-                   @bind-Value:after="SaveChanges"
-                   Color="Color.Primary"
-                   Dense="true"
-                   Size="Size.Small" />
+<MudForm Model="@Daily" @ref="itemForm" ReadOnly="IsHistory()">
+	<div class="d-flex align-center gap-4">
+		<MudCheckBox @bind-Value="Daily.IsDone"
+						 @bind-Value:after="SaveChanges"
+						 Color="Color.Primary"
+						 Dense="true"
+						 Size="Size.Small" />
 
-      <MudTextField @bind-Value="Daily.Timeslot"
-                    @bind-Value:after="SaveChanges"
-                    For="@(() => Daily.Timeslot)"
-                    Label=""
-                    Placeholder="09:00-11:00"
-                    Class="timeslot flex-grow-0 "
-                    Mask="@timeSlotMask"
-                    Margin="Margin.Dense"
-                    Underline="false"
-                    Error="timeslotValid" />
+		<MudTextField @bind-Value="Daily.Timeslot"
+						  @bind-Value:after="SaveChanges"
+						  For="@(() => Daily.Timeslot)"
+						  Label=""
+						  Placeholder="09:00-11:00"
+						  Class=@($"timeslot flex-grow-0 {(Daily.IsDone ? "done-item" : "")}")
+						  Mask="@timeSlotMask"
+						  Margin="Margin.Dense"
+						  Underline="false"
+						  Error="timeslotValid"
+						  @ref="timeslotRef" />
 
-      <MudTextField @bind-Value="Daily.Title"
-                    @bind-Value:after="SaveChanges"
-                    For="@(() => Daily.Title)"
-                    Label=""
-                    Margin="Margin.Dense"
-                    Underline="string.IsNullOrWhiteSpace(Daily.Title)" />
+		<MudTextField @bind-Value="Daily.Title"
+						  @bind-Value:after="SaveChanges"
+						  For="@(() => Daily.Title)"
+						  Label=""
+						  Margin="Margin.Dense"
+						  Underline="@(string.IsNullOrWhiteSpace(Daily.Title))"
+						  Class="@(Daily.IsDone ? "done-item" : "")" />
 
-      <MudIconButton Icon="@Icons.Material.Filled.Info"
-                     Color="Color.Primary"
-                     Size="Size.Medium"
-                     OnClick="OnExpandCollapseClick" />
-   </div>
-   <MudCollapse @bind-Expanded="@_expanded">
-      <MudTextField @bind-Value="Daily.Description"
-                    @bind-Value:after="SaveChanges"
-                    For="@(() => Daily.Description)"
-                    Margin="Margin.Dense" />
+		<MudIconButton Icon="@Icons.Material.Filled.Info"
+							Color="Color.Primary"
+							Size="Size.Small"
+							OnClick="OnExpandCollapseClick" />
 
-   </MudCollapse>
+		<MudIconButton Icon="@Icons.Material.Filled.Delete"
+							Color="Color.Error"
+							Size="Size.Small"
+							OnClick="OnDeleteClick"
+							/>
+	</div>
+	<MudCollapse @bind-Expanded="@_expanded">
+		<MudTextField @bind-Value="Daily.Description"
+						  @bind-Value:after="SaveChanges"
+						  For="@(() => Daily.Description)"
+						  Margin="Margin.Dense" />
+	</MudCollapse>
 
 </MudForm>
 
 @code {
-   private MudForm? itemForm;
-   private IMask timeSlotMask = new PatternMask("00:00-00:00");
-   bool _expanded = false;
+	[Parameter]
+	public DailyItemDTO Daily { get; set; } = new();
 
-   bool timeslotValid { get; set; }
+	[Parameter]
+	public DateOnly date { get; set; } = DateOnly.FromDateTime(DateTime.Now);
 
-   [Parameter]
-   public DailyItemDTO Daily { get; set; } = new();
+	private MudForm? itemForm;
+	private MudTextField<string>? timeslotRef;
 
-   [Parameter]
-   public DateOnly date { get; set; } = DateOnly.FromDateTime(DateTime.Now);
 
-   [Parameter]
-   public EventCallback OnSaved { get; set; }
+	private IMask timeSlotMask = new PatternMask("00:00-00:00");
+	bool timeslotValid { get; set; }
+	bool _expanded = false;
 
-   private async Task SaveChanges() {
-      if (!string.IsNullOrEmpty(Daily.Timeslot) && Daily.Timeslot.Length < 11) {
-         timeslotValid = false;
-         Debug.WriteLine("Timeslot is incomplete. Aborting auto-save.");
-         return;
-      }
-      timeslotValid = true;
-      var validationContext = new ValidationContext(Daily);
-      var validationResults = new List<ValidationResult>();
+	[Parameter]
+	public EventCallback OnSaved { get; set; }
 
-      bool isModelSafeToSave = Validator.TryValidateObject(Daily, validationContext, validationResults, validateAllProperties: true);
+	[Parameter]
+	public bool AutoFocus { get; set; } = false;
 
-      if (isModelSafeToSave) {
-         try {
-            if (Daily.TaskDefinitionId == Guid.Empty) {
-               Debug.WriteLine("Insert New");
-               await TaskService.AddTaskToDateAsync(date, Daily);
+	private bool IsHistory() {
+		return date < DateOnly.FromDateTime(DateTime.Now);
+	}
 
-               await OnSaved.InvokeAsync();
-               return;
-            }
+	private async Task SaveChanges() {
+		if (!string.IsNullOrEmpty(Daily.Timeslot) && Daily.Timeslot.Length < 11) {
+			timeslotValid = false;
+			Debug.WriteLine("Timeslot is incomplete. Aborting auto-save.");
+			return;
+		}
+		timeslotValid = true;
+		var validationContext = new ValidationContext(Daily);
+		var validationResults = new List<ValidationResult>();
 
-            await TaskService.UpdateAsync(Daily);
+		bool isModelSafeToSave = Validator.TryValidateObject(Daily, validationContext, validationResults, validateAllProperties: true);
 
-            await OnSaved.InvokeAsync();
-         }
-         catch (Exception ex) {
-            Debug.WriteLine($"Failed to save: {ex.Message}");
-            Snackbar.Add("Error saving data", Severity.Error);
-         }
-      }
-      else {
-         Debug.WriteLine("Silent validation failed. Waiting for valid data to save...");
-      }
-   }
+		if (isModelSafeToSave) {
+			try {
+				if (Daily.TaskDefinitionId == Guid.Empty) {
+					Debug.WriteLine("Insert New");
+					await TaskService.AddTaskToDateAsync(date, Daily);
 
-   private void OnExpandCollapseClick() {
-      _expanded = !_expanded;
-   }
+					await OnSaved.InvokeAsync();
+					return;
+				}
+
+				await TaskService.UpdateAsync(Daily);
+
+				await OnSaved.InvokeAsync();
+			}
+			catch (Exception ex) {
+				Debug.WriteLine($"Failed to save: {ex.Message}");
+				Snackbar.Add("Error saving data", Severity.Error);
+			}
+		}
+		else {
+			Debug.WriteLine("Silent validation failed. Waiting for valid data to save...");
+		}
+	}
+
+	private void OnExpandCollapseClick() {
+		_expanded = !_expanded;
+	}
+
+	protected override async Task OnAfterRenderAsync(bool firstRender) {
+		if (firstRender && Daily.TaskDefinitionId == Guid.Empty && AutoFocus) {
+			await (timeslotRef?.FocusAsync().AsTask() ?? Task.CompletedTask);
+		}
+	}
+
+	private async Task OnDeleteClick(MouseEventArgs args) {
+		await TaskService.DeleteTaskAsync(Daily.OccurrenceId);
+		await OnSaved.InvokeAsync();
+	}
 }

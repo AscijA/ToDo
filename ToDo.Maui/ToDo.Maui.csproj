@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
 
 	<PropertyGroup>
-		<TargetFrameworks>net10.0-android;net10.0-ios;net10.0-maccatalyst</TargetFrameworks>
+		<TargetFrameworks>net10.0-maccatalyst</TargetFrameworks>
 		<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net10.0-windows10.0.19041.0</TargetFrameworks>
 
 		<!-- Note for MacCatalyst:
@@ -23,7 +23,7 @@
 		<ApplicationTitle>ToDo.Maui</ApplicationTitle>
 
 		<!-- App Identifier -->
-		<ApplicationId>com.companyname.todo.maui</ApplicationId>
+		<ApplicationId>ba.ascija.todo.maui</ApplicationId>
 
 		<!-- Versions -->
 		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
@@ -39,6 +39,26 @@
 		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
 		<UserSecretsId>4b3211d5-6dec-4702-a59a-779855187194</UserSecretsId>
 		<PackageIcon>todoIcon.png</PackageIcon>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net10.0-maccatalyst|AnyCPU'">
+	  <ApplicationTitle>ToDo AscijA</ApplicationTitle>
+	  <ApplicationIdGuid>E1A9E163-DB1B-48EC-B589-D000D0C2C867</ApplicationIdGuid>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net10.0-windows10.0.19041.0|AnyCPU'">
+	  <ApplicationTitle>ToDo AscijA</ApplicationTitle>
+	  <ApplicationIdGuid>E1A9E163-DB1B-48EC-B589-D000D0C2C867</ApplicationIdGuid>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net10.0-maccatalyst|AnyCPU'">
+	  <ApplicationTitle>ToDo AscijA</ApplicationTitle>
+	  <ApplicationIdGuid>E1A9E163-DB1B-48EC-B589-D000D0C2C867</ApplicationIdGuid>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net10.0-windows10.0.19041.0|AnyCPU'">
+	  <ApplicationTitle>ToDo AscijA</ApplicationTitle>
+	  <ApplicationIdGuid>E1A9E163-DB1B-48EC-B589-D000D0C2C867</ApplicationIdGuid>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -69,7 +89,7 @@
 	<ItemGroup>
 		<ProjectReference Include="..\ToDo.Application\ToDo.Application.csproj" />
 		<ProjectReference Include="..\ToDo.Infrastructure\ToDo.Infrastructure.csproj" />
-		<ProjectReference Include="..\ToDo.RazorLib\ToDo.RazorLib.csproj"/>
+		<ProjectReference Include="..\ToDo.RazorLib\ToDo.RazorLib.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>

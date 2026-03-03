@@ -78,7 +78,6 @@ public class TaskService : ITaskService {
             context.DailyPlans.Add(dailyPlan);
         }
 
-        // provjerit jel guid ima
         var taskDef = new TaskDefinition {
             Title = dto.Title,
             Description = dto.Description ?? ""

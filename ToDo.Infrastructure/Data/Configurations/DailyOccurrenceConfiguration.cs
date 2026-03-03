@@ -10,7 +10,7 @@ public class DailyOccurrenceConfiguration : IEntityTypeConfiguration<DailyOccurr
 
         builder.HasKey(o => o.Id);
 
-        builder.Ignore(o => o.IsDone);
+        //builder.Ignore(o => o.IsDone);
 
         builder.Property(o => o.SortOrder)
             .IsRequired();
