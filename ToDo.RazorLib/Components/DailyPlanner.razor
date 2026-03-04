@@ -23,13 +23,13 @@
 				  date="Date"
 				  OnSaved="RefreshListAsync" />
 }
-
+@if(Date >= DateOnly.FromDateTime(DateTime.Now)) {
 <DailyItem Daily="newItem"
 			  date="Date"
 			  OnSaved="RefreshListAsync"
 			  @key="Guid.NewGuid()"
 			  AutoFocus="shouldAutoFocus" />
-
+}
 @code {
 	private DailyItemDTO newItem = new();
 
