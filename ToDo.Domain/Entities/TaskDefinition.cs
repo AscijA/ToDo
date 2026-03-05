@@ -10,11 +10,11 @@ public class TaskDefinition : EntityBase {
     public Bucket Bucket { get; set; }
 
     private readonly List<DailyOccurrence> _dailyOccurrences = new();
-    private readonly List<WeeklyTaskState> _weeklyTaskStates = new();
-    private readonly List<MonthlyTaskState> _monthlyTaskStates = new();
+    private readonly List<WeeklyOccurrence> _weeklyOccurrences = new();
+    private readonly List<MonthlyOccurrence> _monthlyOccurrences = new();
     public IReadOnlyCollection<DailyOccurrence> DailyOccurrences => _dailyOccurrences;
-    public IReadOnlyCollection<WeeklyTaskState> WeeklyTaskStates => _weeklyTaskStates;
-    public IReadOnlyCollection<MonthlyTaskState> MonthlyTaskStates => _monthlyTaskStates;
+    public IReadOnlyCollection<WeeklyOccurrence> WeeklyOccurrences => _weeklyOccurrences;
+    public IReadOnlyCollection<MonthlyOccurrence> MonthlyOccurrences => _monthlyOccurrences;
 
     public TaskDefinition() {
     }

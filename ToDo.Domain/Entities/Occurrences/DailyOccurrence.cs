@@ -1,17 +1,13 @@
-﻿using ToDo.Domain.Entities;
+﻿using ToDo.Domain.Entities.Plans;
 
 namespace ToDo.Domain.Entities.Occurrences;
 
-public class DailyOccurrence : EntityBase {
+public class DailyOccurrence : OccurrenceBase {
     // Foreign keys
     public Guid DailyPlanId { get; set; }
     public DailyPlan DailyPlan { get; set; } = null!;
 
-    public Guid TaskDefinitionId { get; set; }
-    public TaskDefinition TaskDefinition { get; set; } = null!;
-
     public string? Timeslot { get; set; } 
-    public bool IsDone { get; set; }
     public int SortOrder { get; set; }
 
     public DailyOccurrence() { }

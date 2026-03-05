@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using System;
 using System.Collections.Generic;
 using System.Text;
-using ToDo.Domain.Entities;
+using ToDo.Domain.Entities.Plans;
 
 namespace ToDo.Infrastructure.Data.Configurations;
 public class DailyPlanConfiguration : IEntityTypeConfiguration<DailyPlan> {

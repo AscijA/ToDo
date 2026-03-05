@@ -24,12 +24,12 @@ public class TaskDefinitionConfiguration : IEntityTypeConfiguration<TaskDefiniti
             .HasForeignKey(o => o.TaskDefinitionId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        builder.HasMany(t => t.WeeklyTaskStates)
+        builder.HasMany(t => t.WeeklyOccurrences)
             .WithOne(s => s.TaskDefinition)
             .HasForeignKey(s => s.TaskDefinitionId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        builder.HasMany(t => t.MonthlyTaskStates)
+        builder.HasMany(t => t.MonthlyOccurrences)
             .WithOne(s => s.TaskDefinition)
             .HasForeignKey(s => s.TaskDefinitionId)
             .OnDelete(DeleteBehavior.Cascade);

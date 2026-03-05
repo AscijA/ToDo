@@ -1,34 +1,16 @@
-﻿using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Text;
+using Microsoft.EntityFrameworkCore;
 using ToDo.Application.Contracts.DTOs;
 using ToDo.Application.Interfaces.Services;
 using ToDo.Application.Mappings;
-using ToDo.Domain.Entities;
-using ToDo.Domain.Entities.Occurrences;
 using ToDo.Infrastructure.Data;
 
 namespace ToDo.Application.Services;
 
-public class TaskService : ITaskService {
+public class DailyOccurrenceService : IDailyOccurrenceService {
     private readonly IDbContextFactory<TodoDbContext> _contextFactory;
 
-    public TaskService(IDbContextFactory<TodoDbContext> contextFactory) {
+    public DailyOccurrenceService(IDbContextFactory<TodoDbContext> contextFactory) {
         _contextFactory = contextFactory;
-    }
-
-
-    public async Task<List<DailyItemDTO>> GetAllDailyOfDateAsync(DateOnly date) {
-        using var context = await _contextFactory.CreateDbContextAsync();
-        var dailyItem = await context.DailyOccurrences.AsNoTracking()
-            .Include(d => d.TaskDefinition)
-            .Where(d => d.DailyPlan.Date == date)
-            .OrderBy(d => d.SortOrder)
-            .Select(d => d.ToDailyItem())
-            .ToListAsync();
-
-        return dailyItem;
     }
 
     public async Task<DailyItemDTO> GetByIdAsync(Guid id) {
@@ -38,6 +20,7 @@ public class TaskService : ITaskService {
             .FirstOrDefaultAsync(x => x.Id == id);
         return dailyItem?.ToDailyItem() ?? new();
     }
+
     public async Task<DailyItemDTO> UpdateAsync(DailyItemDTO dto) {
         using var context = await _contextFactory.CreateDbContextAsync();
         var dailyItem = await context.DailyOccurrences
@@ -64,37 +47,6 @@ public class TaskService : ITaskService {
             dailyItem.IsDone = !dailyItem.IsDone;
             await context.SaveChangesAsync();
         }
-    }
-
-    public async Task<DailyItemDTO> AddTaskToDateAsync(DateOnly date, DailyItemDTO dto) {
-        using var context = await _contextFactory.CreateDbContextAsync();
-        var dailyPlan = await context.DailyPlans
-            .FirstOrDefaultAsync(x => x.Date == date);
-        if (dailyPlan == null) {
-            dailyPlan = new DailyPlan {
-                Date = date,
-                Occurrences = new List<DailyOccurrence>()
-            };
-            context.DailyPlans.Add(dailyPlan);
-        }
-
-        var taskDef = new TaskDefinition {
-            Title = dto.Title,
-            Description = dto.Description ?? ""
-        };
-        context.TaskDefinitions.Add(taskDef);
-
-        var dailyOccurrence = new DailyOccurrence {
-            DailyPlan = dailyPlan,
-            TaskDefinitionId = dto.TaskDefinitionId,
-            Timeslot = dto.Timeslot,
-            IsDone = false,
-            SortOrder = dailyPlan.Occurrences.Count,
-            TaskDefinition = taskDef
-        };
-        dailyOccurrence = context.DailyOccurrences.Add(dailyOccurrence).Entity;
-        await context.SaveChangesAsync();
-        return dailyOccurrence.ToDailyItem();
     }
 
     public async Task DeleteTaskAsync(Guid occurenceId) {

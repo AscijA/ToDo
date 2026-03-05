@@ -1,5 +1,6 @@
 ﻿@inject ISnackbar Snackbar
-@inject ITaskService TaskService
+@inject IDailyPlanService DailyPlanService
+@inject IDailyOccurrenceService DailyOccurrenceService   
 
 <MudForm Model="@Daily" @ref="itemForm" ReadOnly="IsHistory()">
    <div class="d-flex align-center gap-4">
@@ -83,7 +84,7 @@
 
    private async Task OnDeleteClick(MouseEventArgs args) {
       try {
-         await TaskService.DeleteTaskAsync(Daily.OccurrenceId);
+         await DailyOccurrenceService.DeleteTaskAsync(Daily.OccurrenceId);
          await OnSaved.InvokeAsync();
       }
       catch (Exception ex) {
@@ -108,13 +109,13 @@
          try {
             if (Daily.TaskDefinitionId == Guid.Empty) {
                Debug.WriteLine("Insert New");
-               await TaskService.AddTaskToDateAsync(date, Daily);
+               await DailyPlanService.AddTaskToDateAsync(date, Daily);
 
                await OnSaved.InvokeAsync();
                return;
             }
 
-            await TaskService.UpdateAsync(Daily);
+            await DailyOccurrenceService.UpdateAsync(Daily);
 
             await OnSaved.InvokeAsync();
          }
