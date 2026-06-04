@@ -21,7 +21,14 @@ public class WeeklyOccurrenceService : IWeeklyOccurrenceService {
             .Include(x => x.TaskDefinition)
             .Include(x => x.WeeklyPlan)
             .FirstOrDefaultAsync(x => x.Id == occurenceId);
-        return weeklyItem?.ToWeeklyItem() ?? new();
+        if (weeklyItem == null) return new();
+
+        var color = await context.TaskListItems
+            .Where(i => i.TaskDefinitionId == weeklyItem.TaskDefinitionId)
+            .Select(i => i.TaskList.Color)
+            .FirstOrDefaultAsync();
+
+        return weeklyItem.ToWeeklyItem(color);
     }
 
     public async Task<WeeklyItemDTO> UpdateAsync(WeeklyItemDTO dto) {
@@ -40,8 +47,17 @@ public class WeeklyOccurrenceService : IWeeklyOccurrenceService {
         weeklyItem.DayOfWeek = dto.WeekDay;
         weeklyItem.WeeklyPlan = await GetOrCreateWeeklyPlanAsync(context, dto.Date);
 
+        // Synchronization logic
+        await SyncTaskCompletionStatus(context, weeklyItem.TaskDefinitionId, dto.IsDone);
+
         await context.SaveChangesAsync();
-        return weeklyItem.ToWeeklyItem();
+
+        var color = await context.TaskListItems
+            .Where(i => i.TaskDefinitionId == weeklyItem.TaskDefinitionId)
+            .Select(i => i.TaskList.Color)
+            .FirstOrDefaultAsync();
+
+        return weeklyItem.ToWeeklyItem(color);
     }
 
     public async Task ToggleTaskAsync(Guid occurenceId) {
@@ -49,8 +65,23 @@ public class WeeklyOccurrenceService : IWeeklyOccurrenceService {
         var weeklyItem = await context.WeeklyOccurrences.FirstOrDefaultAsync(x => x.Id == occurenceId);
         if (weeklyItem != null) {
             weeklyItem.IsDone = !weeklyItem.IsDone;
+            await SyncTaskCompletionStatus(context, weeklyItem.TaskDefinitionId, weeklyItem.IsDone);
             await context.SaveChangesAsync();
         }
+    }
+
+    private async Task SyncTaskCompletionStatus(TodoDbContext ctx, Guid taskDefId, bool isDone) {
+        var daily = await ctx.DailyOccurrences.Where(o => o.TaskDefinitionId == taskDefId).ToListAsync();
+        foreach (var o in daily) o.IsDone = isDone;
+
+        var weekly = await ctx.WeeklyOccurrences.Where(o => o.TaskDefinitionId == taskDefId).ToListAsync();
+        foreach (var o in weekly) o.IsDone = isDone;
+
+        var monthly = await ctx.MonthlyOccurrences.Where(o => o.TaskDefinitionId == taskDefId).ToListAsync();
+        foreach (var o in monthly) o.IsDone = isDone;
+
+        var listItems = await ctx.TaskListItems.Where(i => i.TaskDefinitionId == taskDefId).ToListAsync();
+        foreach (var i in listItems) i.IsDone = isDone;
     }
 
     public async Task DeleteTaskAsync(Guid occurenceId) {

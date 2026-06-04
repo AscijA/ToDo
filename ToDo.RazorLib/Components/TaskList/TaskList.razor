@@ -38,7 +38,7 @@
     private TaskListDto? List;
     private List<TaskListItemDto> Items = new();
     
-    private TaskListItemDto newItem = new(Guid.Empty, "", false);
+    private TaskListItemDto newItem = new(Guid.Empty, Guid.Empty, "", false);
     private Guid newItemKey = Guid.NewGuid();
     private bool shouldAutoFocus = false;
 
@@ -55,7 +55,7 @@
 
     private async Task RefreshListAsync() {
         shouldAutoFocus = true;
-        newItem = new(Guid.Empty, "", false);
+        newItem = new(Guid.Empty, Guid.Empty, "", false);
         newItemKey = Guid.NewGuid();
         await LoadListAsync();
     }

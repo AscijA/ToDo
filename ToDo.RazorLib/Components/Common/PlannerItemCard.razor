@@ -1,6 +1,6 @@
 @using ToDo.Application.Contracts.DTOs
 
-<MudForm Model="@Item" ReadOnly="ReadOnly">
+<MudForm Model="@Item" ReadOnly="ReadOnly" Style="@(string.IsNullOrEmpty(Item.Color) ? "" : $"border-left: 6px solid {Item.Color}; padding-left: 12px; margin-left: -12px;")">
 	<div class="d-flex align-center gap-4">
 		<MudCheckBox @bind-Value="Item.IsDone"
 						 @bind-Value:after="InvokeTitleChangedAsync"

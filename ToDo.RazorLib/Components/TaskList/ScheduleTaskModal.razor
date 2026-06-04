@@ -39,6 +39,8 @@
 
     [Parameter] public string Title { get; set; } = string.Empty;
     [Parameter] public string? Description { get; set; }
+    [Parameter] public Guid TaskDefinitionId { get; set; }
+    [Parameter] public bool IsDone { get; set; }
 
     private bool _dailyEnabled;
     private string? _timeslot;
@@ -56,27 +58,33 @@
 
         if (_dailyEnabled) {
             await DailyPlanService.AddTaskToDateAsync(today, new DailyItemDTO {
+                TaskDefinitionId = TaskDefinitionId,
                 Title = Title,
                 Description = Description,
-                Timeslot = _timeslot
+                Timeslot = _timeslot,
+                IsDone = IsDone
             });
         }
 
         if (_weeklyEnabled && _weekDay.HasValue) {
             await DailyPlanService.AddTaskToWeekAsync(today, new WeeklyItemDTO {
+                TaskDefinitionId = TaskDefinitionId,
                 Title = Title,
                 Description = Description,
                 WeekDay = _weekDay,
-                Date = today
+                Date = today,
+                IsDone = IsDone
             });
         }
 
         if (_monthlyEnabled && _dayOfMonth.HasValue) {
             await DailyPlanService.AddTaskToMonthAsync(today, new MonthlyItemDTO {
+                TaskDefinitionId = TaskDefinitionId,
                 Title = Title,
                 Description = Description,
                 DayOfMonth = _dayOfMonth,
-                Date = today
+                Date = today,
+                IsDone = IsDone
             });
         }
 

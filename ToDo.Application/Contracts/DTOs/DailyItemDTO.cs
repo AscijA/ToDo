@@ -6,8 +6,8 @@ public class DailyItemDTO : PlannerItemDTO {
     public DailyItemDTO() {
     }
 
-    public DailyItemDTO(Guid occurrenceId, Guid taskDefinitionId, string title, string? description, bool isDone, string? timeslot)
-        : base(occurrenceId, taskDefinitionId, title, description, isDone) {
+    public DailyItemDTO(Guid occurrenceId, Guid taskDefinitionId, string title, string? description, bool isDone, string? timeslot, string? color = null)
+        : base(occurrenceId, taskDefinitionId, title, description, isDone, color) {
         Timeslot = timeslot;
     }
 

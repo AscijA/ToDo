@@ -6,12 +6,13 @@ public class PlannerItemDTO {
     public PlannerItemDTO() {
     }
 
-    public PlannerItemDTO(Guid occurrenceId, Guid taskDefinitionId, string title, string? description, bool isDone) {
+    public PlannerItemDTO(Guid occurrenceId, Guid taskDefinitionId, string title, string? description, bool isDone, string? color = null) {
         OccurrenceId = occurrenceId;
         TaskDefinitionId = taskDefinitionId;
         Title = title;
         Description = description;
         IsDone = isDone;
+        Color = color;
     }
 
     public Guid OccurrenceId;
@@ -22,4 +23,5 @@ public class PlannerItemDTO {
 
     public string? Description { get; set; } = "";
     public bool IsDone { get; set; }
+    public string? Color { get; set; }
 }

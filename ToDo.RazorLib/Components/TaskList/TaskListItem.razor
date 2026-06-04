@@ -56,7 +56,9 @@
     private async Task OpenScheduleModal() {
         var parameters = new DialogParameters<ScheduleTaskModal> {
             { x => x.Title, Item.Text },
-            { x => x.Description, "" }
+            { x => x.Description, "" },
+            { x => x.TaskDefinitionId, Item.TaskDefinitionId },
+            { x => x.IsDone, Item.IsDone }
         };
 
         await DialogService.ShowAsync<ScheduleTaskModal>("Schedule Task", parameters);

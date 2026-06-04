@@ -18,13 +18,21 @@ public class DailyPlanService : IDailyPlanService {
 
     public async Task<List<DailyItemDTO>> GetAllDailyOfDateAsync(DateOnly date) {
         using var context = await _contextFactory.CreateDbContextAsync();
-        return await context.DailyOccurrences.AsNoTracking()
-            .Include(d => d.TaskDefinition)
-            .Where(d => d.DailyPlan.Date == date)
-            .OrderBy(d => d.Timeslot == null)
-            .ThenBy(d => d.Timeslot)
-            .Select(d => d.ToDailyItem())
-            .ToListAsync();
+        
+        var query = from d in context.DailyOccurrences.AsNoTracking()
+                    where d.DailyPlan.Date == date
+                    orderby d.Timeslot == null, d.Timeslot
+                    select new {
+                        Occurrence = d,
+                        TaskDefinition = d.TaskDefinition,
+                        Color = context.TaskListItems
+                            .Where(i => i.TaskDefinitionId == d.TaskDefinitionId)
+                            .Select(i => i.TaskList.Color)
+                            .FirstOrDefault()
+                    };
+
+        var results = await query.ToListAsync();
+        return results.Select(r => r.Occurrence.ToDailyItem(r.Color)).ToList();
     }
 
     public async Task<DailyItemDTO> AddTaskToDateAsync(DateOnly date, DailyItemDTO dto) {
@@ -39,20 +47,32 @@ public class DailyPlanService : IDailyPlanService {
             context.DailyPlans.Add(dailyPlan);
         }
 
-        var taskDef = CreateTaskDefinition(dto.Title, dto.Description);
-        context.TaskDefinitions.Add(taskDef);
+        TaskDefinition? taskDef = null;
+        if (dto.TaskDefinitionId != Guid.Empty) {
+            taskDef = await context.TaskDefinitions.FindAsync(dto.TaskDefinitionId);
+        }
+
+        if (taskDef == null) {
+            taskDef = CreateTaskDefinition(dto.Title, dto.Description);
+            context.TaskDefinitions.Add(taskDef);
+        }
 
         var dailyOccurrence = new DailyOccurrence {
             DailyPlan = dailyPlan,
-            TaskDefinitionId = dto.TaskDefinitionId,
+            TaskDefinition = taskDef,
             Timeslot = dto.Timeslot,
-            IsDone = false,
-            SortOrder = dailyPlan.Occurrences.Count,
-            TaskDefinition = taskDef
+            IsDone = dto.IsDone,
+            SortOrder = dailyPlan.Occurrences.Count
         };
         dailyOccurrence = context.DailyOccurrences.Add(dailyOccurrence).Entity;
         await context.SaveChangesAsync();
-        return dailyOccurrence.ToDailyItem();
+        
+        var color = await context.TaskListItems
+            .Where(i => i.TaskDefinitionId == dailyOccurrence.TaskDefinitionId)
+            .Select(i => i.TaskList.Color)
+            .FirstOrDefaultAsync();
+
+        return dailyOccurrence.ToDailyItem(color);
     }
 
     public async Task<List<WeeklyItemDTO>> GetAllWeeklyAsync(DateOnly date) {
@@ -99,67 +119,104 @@ public class DailyPlanService : IDailyPlanService {
             await context.SaveChangesAsync();
         }
 
-        return await context.WeeklyOccurrences.AsNoTracking()
-            .Include(w => w.TaskDefinition)
-            .Include(w => w.WeeklyPlan)
-            .Where(w => w.WeeklyPlan.Date == weekStart)
-            .OrderBy(w => w.DayOfWeek == null)
-            .ThenBy(w => w.DayOfWeek)
-            .ThenBy(w => w.TaskDefinition.Title)
-            .Select(w => w.ToWeeklyItem())
-            .ToListAsync();
+        var query = from w in context.WeeklyOccurrences.AsNoTracking()
+                    where w.WeeklyPlan.Date == weekStart
+                    orderby w.DayOfWeek == null, w.DayOfWeek, w.TaskDefinition.Title
+                    select new {
+                        Occurrence = w,
+                        TaskDefinition = w.TaskDefinition,
+                        Color = context.TaskListItems
+                            .Where(i => i.TaskDefinitionId == w.TaskDefinitionId)
+                            .Select(i => i.TaskList.Color)
+                            .FirstOrDefault()
+                    };
+
+        var results = await query.ToListAsync();
+        return results.Select(r => r.Occurrence.ToWeeklyItem(r.Color)).ToList();
     }
 
     public async Task<WeeklyItemDTO> AddTaskToWeekAsync(DateOnly date, WeeklyItemDTO dto) {
         using var context = await _contextFactory.CreateDbContextAsync();
         var weekStart = GetWeekStart(date);
         var weeklyPlan = await GetOrCreateWeeklyPlanAsync(context, weekStart);
-        var taskDef = CreateTaskDefinition(dto.Title, dto.Description);
-        context.TaskDefinitions.Add(taskDef);
+        
+        TaskDefinition? taskDef = null;
+        if (dto.TaskDefinitionId != Guid.Empty) {
+            taskDef = await context.TaskDefinitions.FindAsync(dto.TaskDefinitionId);
+        }
+
+        if (taskDef == null) {
+            taskDef = CreateTaskDefinition(dto.Title, dto.Description);
+            context.TaskDefinitions.Add(taskDef);
+        }
 
         var weeklyOccurrence = new WeeklyOccurrence {
             WeeklyPlan = weeklyPlan,
-            TaskDefinitionId = dto.TaskDefinitionId,
+            TaskDefinition = taskDef,
             DayOfWeek = dto.WeekDay,
-            IsDone = false,
-            TaskDefinition = taskDef
+            IsDone = dto.IsDone
         };
         weeklyOccurrence = context.WeeklyOccurrences.Add(weeklyOccurrence).Entity;
         await context.SaveChangesAsync();
-        return weeklyOccurrence.ToWeeklyItem();
+
+        var color = await context.TaskListItems
+            .Where(i => i.TaskDefinitionId == weeklyOccurrence.TaskDefinitionId)
+            .Select(i => i.TaskList.Color)
+            .FirstOrDefaultAsync();
+
+        return weeklyOccurrence.ToWeeklyItem(color);
     }
 
     public async Task<List<MonthlyItemDTO>> GetAllMonthlyAsync(DateOnly date) {
         using var context = await _contextFactory.CreateDbContextAsync();
         var monthStart = new DateOnly(date.Year, date.Month, 1);
-        return await context.MonthlyOccurrences.AsNoTracking()
-            .Include(m => m.TaskDefinition)
-            .Include(m => m.MonthlyPlan)
-            .Where(m => m.MonthlyPlan.Date == monthStart)
-            .OrderBy(m => m.DayOfMonth == null)
-            .ThenBy(m => m.DayOfMonth)
-            .ThenBy(m => m.TaskDefinition.Title)
-            .Select(m => m.ToMonthlyItem())
-            .ToListAsync();
+        
+        var query = from m in context.MonthlyOccurrences.AsNoTracking()
+                    where m.MonthlyPlan.Date == monthStart
+                    orderby m.DayOfMonth == null, m.DayOfMonth, m.TaskDefinition.Title
+                    select new {
+                        Occurrence = m,
+                        TaskDefinition = m.TaskDefinition,
+                        Color = context.TaskListItems
+                            .Where(i => i.TaskDefinitionId == m.TaskDefinitionId)
+                            .Select(i => i.TaskList.Color)
+                            .FirstOrDefault()
+                    };
+
+        var results = await query.ToListAsync();
+        return results.Select(r => r.Occurrence.ToMonthlyItem(r.Color)).ToList();
     }
 
     public async Task<MonthlyItemDTO> AddTaskToMonthAsync(DateOnly date, MonthlyItemDTO dto) {
         using var context = await _contextFactory.CreateDbContextAsync();
         var monthStart = new DateOnly(date.Year, date.Month, 1);
         var monthlyPlan = await GetOrCreateMonthlyPlanAsync(context, monthStart);
-        var taskDef = CreateTaskDefinition(dto.Title, dto.Description);
-        context.TaskDefinitions.Add(taskDef);
+        
+        TaskDefinition? taskDef = null;
+        if (dto.TaskDefinitionId != Guid.Empty) {
+            taskDef = await context.TaskDefinitions.FindAsync(dto.TaskDefinitionId);
+        }
+
+        if (taskDef == null) {
+            taskDef = CreateTaskDefinition(dto.Title, dto.Description);
+            context.TaskDefinitions.Add(taskDef);
+        }
 
         var monthlyOccurrence = new MonthlyOccurrence {
             MonthlyPlan = monthlyPlan,
-            TaskDefinitionId = dto.TaskDefinitionId,
+            TaskDefinition = taskDef,
             DayOfMonth = dto.DayOfMonth,
-            IsDone = false,
-            TaskDefinition = taskDef
+            IsDone = dto.IsDone
         };
         monthlyOccurrence = context.MonthlyOccurrences.Add(monthlyOccurrence).Entity;
         await context.SaveChangesAsync();
-        return monthlyOccurrence.ToMonthlyItem();
+
+        var color = await context.TaskListItems
+            .Where(i => i.TaskDefinitionId == monthlyOccurrence.TaskDefinitionId)
+            .Select(i => i.TaskList.Color)
+            .FirstOrDefaultAsync();
+
+        return monthlyOccurrence.ToMonthlyItem(color);
     }
 
     private static TaskDefinition CreateTaskDefinition(string title, string? description) {

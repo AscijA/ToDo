@@ -30,7 +30,7 @@
 		<ApplicationVersion>1</ApplicationVersion>
 
 		<!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->
-		<WindowsPackageType>None</WindowsPackageType>
+		<WindowsPackageType>MSIX</WindowsPackageType>
 
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>
@@ -39,7 +39,6 @@
 		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
 		<UserSecretsId>4b3211d5-6dec-4702-a59a-779855187194</UserSecretsId>
 		<PackageIcon>appicon.png</PackageIcon>
-		<ApplicationIcon>Resources\AppIcon\appicon.ico</ApplicationIcon>
 		<Platforms>AnyCPU;x64</Platforms>
 	</PropertyGroup>
 
@@ -100,9 +99,7 @@
 
 	<ItemGroup>
 		<!-- App Icon -->
-		<MauiIcon Include="Resources\AppIcon\appicon.png" DeepLinking="false" BaseSize="1024,1024">
-		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</MauiIcon>
+		<MauiIcon Include="Resources\AppIcon\appicon.png" DeepLinking="false" />
 		<!-- Splash Screen -->
 		<MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#512BD4" BaseSize="128,128" />
 
@@ -133,12 +130,6 @@
 
 	<ItemGroup>
 		<Folder Include="wwwroot\lib\" />
-	</ItemGroup>
-
-	<ItemGroup>
-	  <None Update="Resources\AppIcon\appicon.ico">
-	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	  </None>
 	</ItemGroup>
 
 

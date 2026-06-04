@@ -17,12 +17,9 @@ public partial class App : Microsoft.Maui.Controls.Application {
 
     protected override Window CreateWindow(IActivationState? activationState) {
         return new Window(new MainPage()) {
+            Title = "ToDo",
             Width = 1366,
-            Height = 768,
-            TitleBar = new TitleBar {
-                Title = "ToDo",
-                Icon = "Resources/AppIcon/appicon.ico",
-            }
+            Height = 768
         };
     }
 }

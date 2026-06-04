@@ -15,15 +15,33 @@ public class TaskListService : ITaskListService {
 
     public async Task<List<TaskListDto>> GetAllAsync() {
         using var ctx = await _contextFactory.CreateDbContextAsync();
-        var lists = await ctx.TaskLists.Include(l => l.Items).ToListAsync();
-        return lists.Select(l => new TaskListDto(l.Id, l.Name, l.Color, l.Description, l.Items.Select(i => new TaskListItemDto(i.Id, i.Text, i.IsDone)).ToList())).ToList();
+        var lists = await ctx.TaskLists
+            .Include(l => l.Items)
+                .ThenInclude(i => i.TaskDefinition)
+            .ToListAsync();
+        return lists.Select(l => new TaskListDto(
+            l.Id, 
+            l.Name, 
+            l.Color, 
+            l.Description, 
+            l.Items.Select(i => new TaskListItemDto(i.Id, i.TaskDefinitionId, i.TaskDefinition.Title, i.IsDone)).ToList()
+        )).ToList();
     }
 
     public async Task<TaskListDto?> GetByIdAsync(Guid id) {
         using var ctx = await _contextFactory.CreateDbContextAsync();
-        var l = await ctx.TaskLists.Include(x => x.Items).FirstOrDefaultAsync(x => x.Id == id);
+        var l = await ctx.TaskLists
+            .Include(x => x.Items)
+                .ThenInclude(i => i.TaskDefinition)
+            .FirstOrDefaultAsync(x => x.Id == id);
         if (l == null) return null;
-        return new TaskListDto(l.Id, l.Name, l.Color, l.Description, l.Items.Select(i => new TaskListItemDto(i.Id, i.Text, i.IsDone)).ToList());
+        return new TaskListDto(
+            l.Id, 
+            l.Name, 
+            l.Color, 
+            l.Description, 
+            l.Items.Select(i => new TaskListItemDto(i.Id, i.TaskDefinitionId, i.TaskDefinition.Title, i.IsDone)).ToList()
+        );
     }
 
     public async Task<TaskListDto> CreateAsync(string name, string color, string? description) {
@@ -54,18 +72,36 @@ public class TaskListService : ITaskListService {
 
     public async Task<TaskListItemDto> AddItemAsync(Guid listId, string text) {
         using var ctx = await _contextFactory.CreateDbContextAsync();
-        var li = new TaskListItem { Text = text, TaskListId = listId };
+        
+        var taskDef = new TaskDefinition { Title = text, Description = "" };
+        ctx.TaskDefinitions.Add(taskDef);
+
+        var li = new TaskListItem { TaskDefinition = taskDef, TaskListId = listId };
         ctx.TaskListItems.Add(li);
         await ctx.SaveChangesAsync();
-        return new TaskListItemDto(li.Id, li.Text, li.IsDone);
+        return new TaskListItemDto(li.Id, taskDef.Id, taskDef.Title, li.IsDone);
     }
 
     public async Task UpdateItemAsync(TaskListItemDto item) {
         using var ctx = await _contextFactory.CreateDbContextAsync();
-        var li = await ctx.TaskListItems.FindAsync(item.Id);
+        var li = await ctx.TaskListItems.Include(i => i.TaskDefinition).FirstOrDefaultAsync(i => i.Id == item.Id);
         if (li == null) return;
-        li.Text = item.Text;
+        li.TaskDefinition.Title = item.Text;
         li.IsDone = item.IsDone;
+
+        // Synchronization logic
+        var taskDefId = li.TaskDefinitionId;
+        var isDone = item.IsDone;
+
+        var daily = await ctx.DailyOccurrences.Where(o => o.TaskDefinitionId == taskDefId).ToListAsync();
+        foreach (var o in daily) o.IsDone = isDone;
+
+        var weekly = await ctx.WeeklyOccurrences.Where(o => o.TaskDefinitionId == taskDefId).ToListAsync();
+        foreach (var o in weekly) o.IsDone = isDone;
+
+        var monthly = await ctx.MonthlyOccurrences.Where(o => o.TaskDefinitionId == taskDefId).ToListAsync();
+        foreach (var o in monthly) o.IsDone = isDone;
+
         await ctx.SaveChangesAsync();
     }
 
