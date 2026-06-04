@@ -1,0 +1,65 @@
+@using ToDo.RazorLib.Components.DailyPlanner
+@using ToDo.RazorLib.Components.MonthlyPlanner
+@using ToDo.RazorLib.Components.WeeklyPlanner
+@inject ISettingsService SettingsService
+
+<MudSplitPanel @ref="_splitPanel"
+					Class="split-container mud-width-full mud-height-full"
+					Horizontal="false"
+					Rounded="true"
+					Elevation="0">
+	<FirstPanel>
+        @if (_bigOnLeft) {
+            @RenderSlot(_slotBig)
+        } else {
+            <MudStack StretchItems="StretchItems.All" Class="rounded mud-height-full" Spacing="2">
+                @RenderSlot(_slotSmallTop)
+                @RenderSlot(_slotSmallBottom)
+            </MudStack>
+        }
+	</FirstPanel>
+
+	<SecondPanel>
+        @if (!_bigOnLeft) {
+            @RenderSlot(_slotBig)
+        } else {
+            <MudStack StretchItems="StretchItems.All" Class="rounded mud-height-full" Spacing="2">
+                @RenderSlot(_slotSmallTop)
+                @RenderSlot(_slotSmallBottom)
+            </MudStack>
+        }
+	</SecondPanel>
+</MudSplitPanel>
+
+@code {
+	private MudSplitPanel? _splitPanel;
+
+    private bool _bigOnLeft = true;
+    private string _slotBig = "Daily";
+    private string _slotSmallTop = "Weekly";
+    private string _slotSmallBottom = "Monthly";
+
+    protected override void OnInitialized() {
+        _bigOnLeft = SettingsService.Get("BigOnLeft", "true") == "true";
+        _slotBig = SettingsService.Get("Slot_Big", "Daily");
+        _slotSmallTop = SettingsService.Get("Slot_SmallTop", "Weekly");
+        _slotSmallBottom = SettingsService.Get("Slot_SmallBottom", "Monthly");
+    }
+
+    private RenderFragment RenderSlot(string type) => __builder => {
+        <MudPaper Class="@GetClass(type)" Elevation="1">
+            @switch (type) {
+                case "Daily": <DailyPlanner />; break;
+                case "Weekly": <WeeklyPlanner />; break;
+                case "Monthly": <MonthlyPlanner />; break;
+            }
+        </MudPaper>
+    };
+
+    private string GetClass(string type) => type switch {
+        "Daily" => "panel-daily mud-height-full rounded",
+        "Weekly" => "panel-weekly rounded",
+        "Monthly" => "panel-monthly rounded",
+        _ => "rounded"
+    };
+}

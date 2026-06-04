@@ -1,45 +1,181 @@
-﻿@page "/"
-@using ToDo.RazorLib.Components
-<MudThemeProvider Theme="ODPTheme.Theme"
-                  IsDarkMode="true"
-                  ObserveSystemDarkModeChange="false" />
+@page "/"
+@using ToDo.RazorLib.Components.Layouts
+@using ToDo.RazorLib.Components.TaskList
+@using ToDo.RazorLib.Components.Common
+@using ToDo.Application.Contracts.DTOs
+@using ToDo.Application.Interfaces.Services
+@using ToDo.RazorLib.Services
+@inject ITaskListService ListService
+@inject IDialogService DialogService
+@inject ISettingsService SettingsService
+
+<MudThemeProvider @ref="_mudThemeProvider"
+						Theme="_currentTheme"
+						@bind-IsDarkMode="_isDarkMode" />
 <MudDialogProvider />
 <MudSnackbarProvider />
 <MudPopoverProvider />
 <PageTitle>Planner Dashboard</PageTitle>
 
 <div class="planner-dashboard">
-   <aside class="sidebar" aria-label="Primary">
-      <div class="sidebar-spacer"></div>
-      <MudIconButton Icon="@Icons.Material.Filled.Add" aria-label="New" Color="Color.Primary" />
-   </aside>
+	<aside class="sidebar" aria-label="Primary">
+		<div class="sidebar-top">
+			<MudIconButton Icon="@Icons.Material.Filled.Schedule"
+								aria-label="Schedule"
+								Color="@(isPlannerSelected ? Color.Primary : Color.Default)"
+								OnClick="ShowPlanner" />
 
-   <MudSplitPanel @ref="_splitPanel"
-                  Class="split-container mud-width-full mud-height-full"
-                  Horizontal="false"
-                  Rounded="true"
-                  Elevation="0"
-                  >
-      <FirstPanel>
-         <MudPaper Class="panel-daily mud-height-full rounded" Elevation="1">
-            <DailyPlanner />
-         </MudPaper>
-      </FirstPanel>
+			@foreach (var list in taskLists) {
+				<div class="sidebar-list-item @(selectedListId == list.Id ? "selected" : "")"
+					  style="--list-color: @list.Color"
+					  @onclick="() => SelectList(list.Id)">
+					@GetIconLetter(list.Name)
+				</div>
+			}
 
-      <SecondPanel>
-         <MudStack StretchItems="StretchItems.All" Class="rounded mud-height-full" Spacing="2">
-            <MudPaper Class="panel-weekly rounded" Elevation="1">
-               <WeeklyPlanner />
-            </MudPaper>
+		</div>
 
-            <MudPaper Class="panel-monthly rounded" Elevation="1">
-               <MonthlyPlanner/>
-            </MudPaper>
-         </MudStack>
-      </SecondPanel>
-   </MudSplitPanel>
+		<div class="sidebar-bottom">
+			<MudIconButton Icon="@Icons.Material.Filled.Add"
+								aria-label="New"
+								Color="Color.Primary"
+								OnClick="AddNewList" />
+			<MudIconButton Icon="@Icons.Material.Filled.Sync"
+								aria-label="Sync"
+								Color="Color.Primary"
+								OnClick="()=>{}" />
+			<MudIconButton Icon="@Icons.Material.Filled.Settings"
+								aria-label="Settings"
+								Color="Color.Primary"
+								OnClick="OpenSettings" />
+		</div>
+	</aside>
+
+	<div class="main-content mud-height-full">
+		@if (isPlannerSelected) {
+			<Planner @key="_plannerKey" />
+		}
+		else if (selectedListId != Guid.Empty) {
+			<MudPaper Class="panel-daily mud-height-full rounded" Elevation="1">
+				<TaskList ListId="selectedListId"
+							 OnDeleted="OnListDeleted"
+							 OnUpdated="LoadTaskLists" />
+			</MudPaper>
+		}
+	</div>
 </div>
 
 @code {
-	private MudSplitPanel? _splitPanel;
+	private List<TaskListDto> taskLists = new();
+	private bool isPlannerSelected = true;
+	private Guid selectedListId = Guid.Empty;
+
+	private MudThemeProvider? _mudThemeProvider;
+	private string _appearance = "System";
+	private bool _isDarkMode = true;
+	private MudTheme _currentTheme = Themes.OneDarkPro;
+	private Guid _plannerKey = Guid.NewGuid();
+
+	protected override async Task OnInitializedAsync() {
+		LoadSettings();
+		await LoadTaskLists();
+	}
+
+	protected override async Task OnAfterRenderAsync(bool firstRender) {
+		if (firstRender && _appearance == "System" && _mudThemeProvider != null) {
+			await _mudThemeProvider.WatchSystemDarkModeAsync(OnSystemDarkModeChanged);
+			var systemDarkMode = await _mudThemeProvider.GetSystemDarkModeAsync();
+			if (_isDarkMode != systemDarkMode) {
+				_isDarkMode = systemDarkMode;
+				StateHasChanged();
+			}
+		}
+	}
+
+	private void LoadSettings() {
+		_appearance = SettingsService.Get("Appearance", "System");
+		if (_appearance == "Light")
+			_isDarkMode = false;
+		else if (_appearance == "Dark")
+			_isDarkMode = true;
+
+		var themeName = SettingsService.Get("Theme", "ODP");
+
+		if (themeName == "Custom") {
+			var primary = SettingsService.Get("Custom_Primary", "#C678DD");
+			var secondary = SettingsService.Get("Custom_Secondary", "#61AFEF");
+			var background = SettingsService.Get("Custom_Background", "#282C34");
+			var surface = SettingsService.Get("Custom_Surface", "#21252B");
+			_currentTheme = Themes.CreateCustomTheme(primary, secondary, background, surface);
+		}
+		else {
+			_currentTheme = themeName switch {
+				"Blue" => Themes.Blue,
+				"Solarized" => Themes.Solarized,
+				"Green" => Themes.Green,
+				_ => Themes.OneDarkPro
+			};
+		}
+	}
+
+	private Task OnSystemDarkModeChanged(bool isDarkMode) {
+		if (_appearance == "System") {
+			_isDarkMode = isDarkMode;
+			StateHasChanged();
+		}
+		return Task.CompletedTask;
+	}
+
+	private async Task OpenSettings() {
+		var dialog = await DialogService.ShowAsync<SettingsModal>("Settings", new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+		var result = await dialog.Result;
+
+		if (result != null && !result.Canceled) {
+			LoadSettings();
+			_plannerKey = Guid.NewGuid(); // Force Planner refresh
+			StateHasChanged();
+		}
+	}
+
+	private async Task LoadTaskLists() {
+		for (int i = 0; i < 3; i++) {
+			try {
+				taskLists = await ListService.GetAllAsync();
+				return;
+			}
+			catch {
+				if (i == 2)
+					throw;
+				await Task.Delay(500);
+			}
+		}
+	}
+
+	private void ShowPlanner() {
+		isPlannerSelected = true;
+		selectedListId = Guid.Empty;
+	}
+
+	private void SelectList(Guid id) {
+		isPlannerSelected = false;
+		selectedListId = id;
+	}
+
+	private async Task AddNewList() {
+		var dialog = await DialogService.ShowAsync<TaskListModal>("New Task List");
+		var result = await dialog.Result;
+
+		if (result != null && !result.Canceled && result.Data is TaskListModal.TaskListModalResult modalResult) {
+			var newList = await ListService.CreateAsync(modalResult.Name, modalResult.Color, modalResult.Description);
+			await LoadTaskLists();
+			SelectList(newList.Id);
+		}
+	}
+
+	private async Task OnListDeleted() {
+		await LoadTaskLists();
+		ShowPlanner();
+	}
+
+	private string GetIconLetter(string name) => string.IsNullOrWhiteSpace(name) ? "?" : name.Trim()[0].ToString().ToUpperInvariant();
 }

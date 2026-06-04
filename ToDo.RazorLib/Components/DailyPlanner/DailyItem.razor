@@ -1,4 +1,5 @@
-﻿@inject ISnackbar Snackbar
+﻿@using ToDo.RazorLib.Components.Common
+@inject ISnackbar Snackbar
 @inject IDailyPlanService DailyPlanService
 @inject IDailyOccurrenceService DailyOccurrenceService   
 
@@ -19,12 +20,6 @@
                     Error="timeslotValid"
                     @ref="timeslotRef" />
    </Schedule>
-   <Details>
-      <MudTextField @bind-Value="Daily.Description"
-                    @bind-Value:after="SaveChanges"
-                    For="@(() => Daily.Description)"
-                    Margin="Margin.Dense" />
-   </Details>
 </PlannerItemCard>
 
 @code {

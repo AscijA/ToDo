@@ -1,0 +1,85 @@
+@using ToDo.Application.Contracts.DTOs
+@using ToDo.Application.Interfaces.Services
+@inject IDailyPlanService DailyPlanService
+
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.h6">@Title</MudText>
+        
+        <MudDivider Class="my-4" />
+
+        <div class="d-flex align-center gap-4 mb-2">
+            <MudCheckBox @bind-Value="_dailyEnabled" Color="Color.Primary" Label="Daily" />
+            <MudTextField @bind-Value="_timeslot" Label="Timeslot" Disabled="!_dailyEnabled" Placeholder="09:00" Mask="@(new PatternMask("00:00"))" />
+        </div>
+
+        <div class="d-flex align-center gap-4 mb-2">
+            <MudCheckBox @bind-Value="_weeklyEnabled" Color="Color.Primary" Label="Weekly" />
+            <MudSelect T="DayOfWeek?" @bind-Value="_weekDay" Label="Day of Week" Disabled="!_weeklyEnabled">
+                <MudSelectItem T="DayOfWeek?" Value="@null">Select Day</MudSelectItem>
+                @foreach (DayOfWeek day in Enum.GetValues(typeof(DayOfWeek))) {
+                    <MudSelectItem T="DayOfWeek?" Value="@day">@day</MudSelectItem>
+                }
+            </MudSelect>
+        </div>
+
+        <div class="d-flex align-center gap-4 mb-4">
+            <MudCheckBox @bind-Value="_monthlyEnabled" Color="Color.Primary" Label="Monthly" />
+            <MudNumericField T="int?" @bind-Value="_dayOfMonth" Label="Day of Month" Min="1" Max="31" Disabled="!_monthlyEnabled" />
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit">Schedule</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public string? Description { get; set; }
+
+    private bool _dailyEnabled;
+    private string? _timeslot;
+
+    private bool _weeklyEnabled;
+    private DayOfWeek? _weekDay;
+
+    private bool _monthlyEnabled;
+    private int? _dayOfMonth;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit() {
+        var today = DateOnly.FromDateTime(DateTime.Now);
+
+        if (_dailyEnabled) {
+            await DailyPlanService.AddTaskToDateAsync(today, new DailyItemDTO {
+                Title = Title,
+                Description = Description,
+                Timeslot = _timeslot
+            });
+        }
+
+        if (_weeklyEnabled && _weekDay.HasValue) {
+            await DailyPlanService.AddTaskToWeekAsync(today, new WeeklyItemDTO {
+                Title = Title,
+                Description = Description,
+                WeekDay = _weekDay,
+                Date = today
+            });
+        }
+
+        if (_monthlyEnabled && _dayOfMonth.HasValue) {
+            await DailyPlanService.AddTaskToMonthAsync(today, new MonthlyItemDTO {
+                Title = Title,
+                Description = Description,
+                DayOfMonth = _dayOfMonth,
+                Date = today
+            });
+        }
+
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+}

@@ -1,0 +1,64 @@
+@using ToDo.Application.Contracts.DTOs
+@using ToDo.RazorLib.Components.Common
+@inject ITaskListService ListService
+@inject IDialogService DialogService
+
+<PlannerItemCard Item="@_plannerItem"
+                 OnDelete="OnDeleteClick"
+                 OnTitleChanged="SaveChanges"
+                 AutoFocus="AutoFocus">
+    <Schedule>
+        @if (Item.Id != Guid.Empty) {
+            <MudIconButton Icon="@Icons.Material.Filled.CalendarToday" 
+                           Size="Size.Small" 
+                           Color="Color.Primary" 
+                           OnClick="OpenScheduleModal" />
+        }
+        else {
+            <div style="width: 32px;"></div>
+        }
+    </Schedule>
+</PlannerItemCard>
+
+@code {
+    [Parameter] public TaskListItemDto Item { get; set; } = null!;
+    [Parameter] public Guid ListId { get; set; }
+    [Parameter] public EventCallback OnDeleted { get; set; }
+    [Parameter] public EventCallback OnSaved { get; set; }
+    [Parameter] public bool AutoFocus { get; set; }
+
+    private PlannerItemDTO _plannerItem = new();
+
+    protected override void OnParametersSet() {
+        _plannerItem = new PlannerItemDTO(Item.Id, Guid.Empty, Item.Text, null, Item.IsDone);
+    }
+
+    private async Task SaveChanges() {
+        if (string.IsNullOrWhiteSpace(_plannerItem.Title)) return;
+
+        if (Item.Id == Guid.Empty) {
+            await ListService.AddItemAsync(ListId, _plannerItem.Title);
+            await OnSaved.InvokeAsync();
+        }
+        else {
+            var updatedItem = Item with { Text = _plannerItem.Title, IsDone = _plannerItem.IsDone };
+            await ListService.UpdateItemAsync(updatedItem);
+        }
+    }
+
+    private async Task OnDeleteClick(MouseEventArgs args) {
+        if (Item.Id != Guid.Empty) {
+            await ListService.DeleteItemAsync(Item.Id);
+        }
+        await OnDeleted.InvokeAsync();
+    }
+
+    private async Task OpenScheduleModal() {
+        var parameters = new DialogParameters<ScheduleTaskModal> {
+            { x => x.Title, Item.Text },
+            { x => x.Description, "" }
+        };
+
+        await DialogService.ShowAsync<ScheduleTaskModal>("Schedule Task", parameters);
+    }
+}

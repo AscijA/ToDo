@@ -15,6 +15,8 @@ public class TodoDbContext : DbContext {
     public DbSet<DailyOccurrence> DailyOccurrences => Set<DailyOccurrence>();
     public DbSet<WeeklyOccurrence> WeeklyOccurrences => Set<WeeklyOccurrence>();
     public DbSet<MonthlyOccurrence> MonthlyOccurrences => Set<MonthlyOccurrence>();
+    public DbSet<TaskList> TaskLists => Set<TaskList>();
+    public DbSet<TaskListItem> TaskListItems => Set<TaskListItem>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder) {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(TodoDbContext).Assembly);

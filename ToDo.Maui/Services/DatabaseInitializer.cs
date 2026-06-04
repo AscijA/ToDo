@@ -13,7 +13,16 @@ public class DatabaseInitializer {
     public async Task InitializeAsync() {
         using var context = await _contextFactory.CreateDbContextAsync();
 
-        //await context.Database.EnsureDeletedAsync();
+        // For development/prototype: if schema changes, we need to recreate
+        // In a real app, we would use migrations.
+        try {
+            // Try a simple query to see if the schema matches
+            await context.TaskLists.AnyAsync();
+        }
+        catch {
+            // If it fails (likely due to missing columns), recreate
+            await context.Database.EnsureDeletedAsync();
+        }
 
         await context.Database.EnsureCreatedAsync();
     }

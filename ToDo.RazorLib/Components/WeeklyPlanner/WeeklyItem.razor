@@ -1,3 +1,4 @@
+@using ToDo.RazorLib.Components.Common
 @inject ISnackbar Snackbar
 @inject IDailyPlanService DailyPlanService
 @inject IWeeklyOccurrenceService WeeklyOccurrenceService
@@ -17,7 +18,7 @@
 					  Clearable="true"
 					  FitContent="true"
 					  RelativeWidth="DropdownWidth.Adaptive">
-			<MudSelectItem T="DayOfWeek?" Value="@null">None</MudSelectItem>
+			<MudSelectItem T="DayOfWeek?" Value="@null"></MudSelectItem>
 			<MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Sunday">Sunday</MudSelectItem>
 			<MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Monday">Monday</MudSelectItem>
 			<MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Tuesday">Tuesday</MudSelectItem>
@@ -27,12 +28,6 @@
 			<MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Saturday">Saturday</MudSelectItem>
 		</MudSelect>
 	</Schedule>
-	<Details>
-		<MudTextField @bind-Value="Weekly.Description"
-						  @bind-Value:after="SaveChanges"
-						  For="@(() => Weekly.Description)"
-						  Margin="Margin.Dense" />
-	</Details>
 </PlannerItemCard>
 
 @code {

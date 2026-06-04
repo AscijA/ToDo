@@ -5,7 +5,14 @@ using ToDo.Application.Services;
 using ToDo.Infrastructure.Data;
 using ToDo.Maui.Services;
 using ToDo.RazorLib.Services;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Maui.LifecycleEvents;
 
+#if WINDOWS
+using Microsoft.UI.Windowing;
+using WinRT.Interop;
+using Microsoft.UI;
+#endif
 namespace ToDo.Maui;
 
 public static class MauiProgram {
@@ -16,6 +23,25 @@ public static class MauiProgram {
             .ConfigureFonts(fonts => {
                 fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
             });
+        builder.ConfigureLifecycleEvents(events => {
+#if WINDOWS
+            events.AddWindows(windows => {
+                windows.OnWindowCreated(window => {
+                    var hwnd = WindowNative.GetWindowHandle(window);
+                    var windowId = Win32Interop.GetWindowIdFromWindow(hwnd);
+                    var appWindow = AppWindow.GetFromWindowId(windowId);
+
+                    var iconPath = Path.Combine(
+                        AppContext.BaseDirectory,
+                        "Platforms",
+                        "Windows",
+                        "appicon.ico");
+
+                    appWindow.SetIcon(iconPath);
+                });
+            });
+#endif
+        });
         builder.Services.AddMudServices();
         builder.Services.AddMauiBlazorWebView();
 
@@ -33,6 +59,7 @@ public static class MauiProgram {
         builder.Services.AddTransient<IDailyOccurrenceService, DailyOccurrenceService>();
         builder.Services.AddTransient<IWeeklyOccurrenceService, WeeklyOccurrenceService>();
         builder.Services.AddTransient<IMonthlyOccurrenceService, MonthlyOccurrenceService>();
+        builder.Services.AddTransient<ITaskListService, TaskListService>();
         builder.Services.AddSingleton<ISettingsService, MauiSettingsService>();
         return builder.Build();
     }

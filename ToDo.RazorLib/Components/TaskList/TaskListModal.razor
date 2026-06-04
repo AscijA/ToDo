@@ -1,0 +1,31 @@
+@using MudBlazor
+
+<MudDialog>
+    <DialogContent>
+        <MudTextField @bind-Value="Name" Label="Name" Required="true" />
+        <MudColorPicker @bind-Text="ListColor" Label="Color" Style="@($"color: {ListColor};")" />
+        <MudTextField @bind-Value="Description" Label="Description" Lines="3" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit">Save</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public string Name { get; set; } = string.Empty;
+    [Parameter] public string ListColor { get; set; } = "#594AE2";
+    [Parameter] public string? Description { get; set; }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void Submit() {
+        if (string.IsNullOrWhiteSpace(Name)) return;
+        
+        MudDialog.Close(DialogResult.Ok(new TaskListModalResult(Name, ListColor, Description)));
+    }
+
+    public record TaskListModalResult(string Name, string Color, string? Description);
+}

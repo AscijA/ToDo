@@ -1,3 +1,4 @@
+@using ToDo.RazorLib.Components.Common
 @inject ISnackbar Snackbar
 @inject IDailyPlanService DailyPlanService
 @inject IMonthlyOccurrenceService MonthlyOccurrenceService
@@ -18,12 +19,6 @@
 						  HideSpinButtons="true"
 						  MaxLength="2"/>
 	</Schedule>
-	<Details>
-		<MudTextField @bind-Value="Monthly.Description"
-					  @bind-Value:after="SaveChanges"
-					  For="@(() => Monthly.Description)"
-					  Margin="Margin.Dense" />
-	</Details>
 </PlannerItemCard>
 
 @code {

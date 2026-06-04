@@ -1,0 +1,87 @@
+@inject ITaskListService ListService
+@inject IDialogService DialogService
+@using ToDo.Application.Contracts.DTOs
+@using ToDo.RazorLib.Components.TaskList
+
+<div class="tasklist-view mud-height-full">
+    <div class="d-flex align-center justify-space-between mb-4">
+        <MudText Typo="Typo.h5" 
+                 Style="cursor: pointer;" 
+                 @onclick="EditList">
+            @List?.Name
+        </MudText>
+        <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                       Color="Color.Error" 
+                       OnClick="DeleteList" />
+    </div>
+
+    <div class="tasklist-items">
+        @if (Items != null) {
+            @foreach (var it in Items) {
+                <TaskListItem @key="it.Id" Item="it" OnDeleted="LoadListAsync" />
+            }
+        }
+        
+        <TaskListItem Item="newItem" 
+                      ListId="ListId" 
+                      OnSaved="RefreshListAsync" 
+                      @key="newItemKey"
+                      AutoFocus="shouldAutoFocus" />
+    </div>
+</div>
+
+@code {
+    [Parameter] public Guid ListId { get; set; }
+    [Parameter] public EventCallback OnDeleted { get; set; }
+    [Parameter] public EventCallback OnUpdated { get; set; }
+
+    private TaskListDto? List;
+    private List<TaskListItemDto> Items = new();
+    
+    private TaskListItemDto newItem = new(Guid.Empty, "", false);
+    private Guid newItemKey = Guid.NewGuid();
+    private bool shouldAutoFocus = false;
+
+    protected override async Task OnParametersSetAsync() {
+        await LoadListAsync();
+    }
+
+    private async Task LoadListAsync() {
+        List = await ListService.GetByIdAsync(ListId);
+        if (List != null) {
+            Items = List.Items;
+        }
+    }
+
+    private async Task RefreshListAsync() {
+        shouldAutoFocus = true;
+        newItem = new(Guid.Empty, "", false);
+        newItemKey = Guid.NewGuid();
+        await LoadListAsync();
+    }
+
+    private async Task EditList() {
+        if (List == null) return;
+
+        var parameters = new DialogParameters<TaskListModal> {
+            { x => x.Name, List.Name },
+            { x => x.ListColor, List.Color },
+            { x => x.Description, List.Description }
+        };
+
+        var dialog = await DialogService.ShowAsync<TaskListModal>("Edit List", parameters);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled && result.Data is TaskListModal.TaskListModalResult modalResult) {
+            await ListService.UpdateAsync(List.Id, modalResult.Name, modalResult.Color, modalResult.Description);
+            await LoadListAsync();
+            await OnUpdated.InvokeAsync();
+        }
+    }
+
+    private async Task DeleteList() {
+        if (List == null) return;
+        await ListService.DeleteAsync(List.Id);
+        await OnDeleted.InvokeAsync();
+    }
+}

@@ -3,6 +3,7 @@
 <MudForm Model="@Item" ReadOnly="ReadOnly">
 	<div class="d-flex align-center gap-4">
 		<MudCheckBox @bind-Value="Item.IsDone"
+						 @bind-Value:after="InvokeTitleChangedAsync"
 						 Color="Color.Primary"
 						 Dense="true"
 						 Size="Size.Small" />
@@ -29,7 +30,10 @@
 	</div>
 
 	<MudCollapse @bind-Expanded="_expanded">
-		@Details
+		<MudTextField @bind-Value="Item.Description"
+					  @bind-Value:after="InvokeTitleChangedAsync"
+					  Margin="Margin.Dense"
+					  Lines="1" />
 	</MudCollapse>
 </MudForm>
 
@@ -39,9 +43,6 @@
 
 	[Parameter]
 	public RenderFragment? Schedule { get; set; }
-
-	[Parameter]
-	public RenderFragment? Details { get; set; }
 
 	[Parameter]
 	public bool ReadOnly { get; set; }

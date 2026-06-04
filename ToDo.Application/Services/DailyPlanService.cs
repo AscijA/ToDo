@@ -21,7 +21,8 @@ public class DailyPlanService : IDailyPlanService {
         return await context.DailyOccurrences.AsNoTracking()
             .Include(d => d.TaskDefinition)
             .Where(d => d.DailyPlan.Date == date)
-            .OrderBy(d => d.SortOrder)
+            .OrderBy(d => d.Timeslot == null)
+            .ThenBy(d => d.Timeslot)
             .Select(d => d.ToDailyItem())
             .ToListAsync();
     }
@@ -57,6 +58,47 @@ public class DailyPlanService : IDailyPlanService {
     public async Task<List<WeeklyItemDTO>> GetAllWeeklyAsync(DateOnly date) {
         using var context = await _contextFactory.CreateDbContextAsync();
         var weekStart = GetWeekStart(date);
+        var weekEnd = weekStart.AddDays(6);
+
+        // Feature 2: Move Monthly to Weekly
+        var relevantMonths = new List<DateOnly> {
+            new DateOnly(weekStart.Year, weekStart.Month, 1),
+            new DateOnly(weekEnd.Year, weekEnd.Month, 1)
+        }.Distinct().ToList();
+
+        bool changed = false;
+        foreach (var monthStart in relevantMonths) {
+            var monthlyOccurrences = await context.MonthlyOccurrences
+                .Include(m => m.TaskDefinition)
+                .Where(m => m.MonthlyPlan.Date == monthStart && m.DayOfMonth != null)
+                .ToListAsync();
+
+            foreach (var m in monthlyOccurrences) {
+                try {
+                    var occurrenceDate = new DateOnly(monthStart.Year, monthStart.Month, m.DayOfMonth!.Value);
+                    if (occurrenceDate >= weekStart && occurrenceDate <= weekEnd) {
+                        var weeklyPlan = await GetOrCreateWeeklyPlanAsync(context, weekStart);
+                        var weeklyOccurrence = new WeeklyOccurrence {
+                            WeeklyPlan = weeklyPlan,
+                            TaskDefinitionId = m.TaskDefinitionId,
+                            DayOfWeek = occurrenceDate.DayOfWeek,
+                            IsDone = m.IsDone,
+                            TaskDefinition = m.TaskDefinition
+                        };
+                        context.WeeklyOccurrences.Add(weeklyOccurrence);
+                        context.MonthlyOccurrences.Remove(m);
+                        changed = true;
+                    }
+                }
+                catch (ArgumentOutOfRangeException) {
+                    // Invalid day for month (e.g. 31st in February) - skip
+                }
+            }
+        }
+        if (changed) {
+            await context.SaveChangesAsync();
+        }
+
         return await context.WeeklyOccurrences.AsNoTracking()
             .Include(w => w.TaskDefinition)
             .Include(w => w.WeeklyPlan)
