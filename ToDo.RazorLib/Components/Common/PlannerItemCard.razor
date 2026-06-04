@@ -1,0 +1,78 @@
+@using ToDo.Application.Contracts.DTOs
+
+<MudForm Model="@Item" ReadOnly="ReadOnly">
+	<div class="d-flex align-center gap-4">
+		<MudCheckBox @bind-Value="Item.IsDone"
+						 Color="Color.Primary"
+						 Dense="true"
+						 Size="Size.Small" />
+
+		@Schedule
+
+		<MudTextField @bind-Value="Item.Title"
+					  @bind-Value:after="InvokeTitleChangedAsync"
+					  @ref="titleRef"
+					  Label=""
+					  Margin="Margin.Dense"
+					  Underline="@(string.IsNullOrWhiteSpace(Item.Title))"
+					  Class="@(Item.IsDone ? "done-item" : string.Empty)" />
+
+		<MudIconButton Icon="@Icons.Material.Filled.Info"
+						 Color="Color.Primary"
+						 Size="Size.Small"
+						 OnClick="OnToggleExpanded" />
+
+		<MudIconButton Icon="@Icons.Material.Filled.Delete"
+						 Color="Color.Error"
+						 Size="Size.Small"
+						 OnClick="OnDeleteClick" />
+	</div>
+
+	<MudCollapse @bind-Expanded="_expanded">
+		@Details
+	</MudCollapse>
+</MudForm>
+
+@code {
+	[Parameter]
+	public PlannerItemDTO Item { get; set; } = new();
+
+	[Parameter]
+	public RenderFragment? Schedule { get; set; }
+
+	[Parameter]
+	public RenderFragment? Details { get; set; }
+
+	[Parameter]
+	public bool ReadOnly { get; set; }
+
+	[Parameter]
+	public bool AutoFocus { get; set; }
+
+	[Parameter]
+	public EventCallback<MouseEventArgs> OnDelete { get; set; }
+
+	[Parameter]
+	public EventCallback OnTitleChanged { get; set; }
+
+	private MudTextField<string>? titleRef;
+	private bool _expanded;
+
+	protected override async Task OnAfterRenderAsync(bool firstRender) {
+		if (firstRender && Item.TaskDefinitionId == Guid.Empty && AutoFocus) {
+			await (titleRef?.FocusAsync().AsTask() ?? Task.CompletedTask);
+		}
+	}
+
+	private void OnToggleExpanded() {
+		_expanded = !_expanded;
+	}
+
+	private async Task OnDeleteClick() {
+		await OnDelete.InvokeAsync(new MouseEventArgs());
+	}
+
+	private async Task InvokeTitleChangedAsync() {
+		await OnTitleChanged.InvokeAsync();
+	}
+}

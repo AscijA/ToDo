@@ -8,6 +8,10 @@ public class MonthlyOccurrenceConfiguration : IEntityTypeConfiguration<MonthlyOc
     public void Configure(EntityTypeBuilder<MonthlyOccurrence> builder) {
         builder.HasKey(o => o.Id);
 
+        builder.Property(o => o.DayOfMonth);
+
+        builder.HasIndex(o => new { o.MonthlyPlanId, o.DayOfMonth, o.TaskDefinitionId });
+
         builder.HasOne(o => o.MonthlyPlan)
             .WithMany(p => p.Occurrences)
             .HasForeignKey(o => o.MonthlyPlanId)

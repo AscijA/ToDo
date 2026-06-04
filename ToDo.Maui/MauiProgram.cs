@@ -31,6 +31,8 @@ public static class MauiProgram {
         builder.Services.AddSingleton<DatabaseInitializer>();
         builder.Services.AddTransient<IDailyPlanService, DailyPlanService>();
         builder.Services.AddTransient<IDailyOccurrenceService, DailyOccurrenceService>();
+        builder.Services.AddTransient<IWeeklyOccurrenceService, WeeklyOccurrenceService>();
+        builder.Services.AddTransient<IMonthlyOccurrenceService, MonthlyOccurrenceService>();
         builder.Services.AddSingleton<ISettingsService, MauiSettingsService>();
         return builder.Build();
     }

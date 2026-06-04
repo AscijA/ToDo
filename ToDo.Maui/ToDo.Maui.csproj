@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
 
 	<PropertyGroup>
-		<TargetFrameworks>net10.0-maccatalyst</TargetFrameworks>
+		<PublishReadyToRun>false</PublishReadyToRun>
 		<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net10.0-windows10.0.19041.0</TargetFrameworks>
 
 		<!-- Note for MacCatalyst:
@@ -10,7 +10,7 @@
             The Mac App Store will NOT accept apps with ONLY maccatalyst-arm64 indicated;
             either BOTH runtimes must be indicated or ONLY macatalyst-x64. -->
 		<!-- For example: <RuntimeIdentifiers>maccatalyst-x64;maccatalyst-arm64</RuntimeIdentifiers> -->
-
+		<WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
 		<OutputType>Exe</OutputType>
 		<RootNamespace>ToDo.Maui</RootNamespace>
 		<UseMaui>true</UseMaui>
@@ -18,9 +18,9 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<EnableDefaultCssItems>false</EnableDefaultCssItems>
 		<Nullable>enable</Nullable>
-
+	
 		<!-- Display name -->
-		<ApplicationTitle>ToDo.Maui</ApplicationTitle>
+		<ApplicationTitle>To Do</ApplicationTitle>
 
 		<!-- App Identifier -->
 		<ApplicationId>ba.ascija.todo.maui</ApplicationId>
@@ -30,7 +30,7 @@
 		<ApplicationVersion>1</ApplicationVersion>
 
 		<!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->
-		<WindowsPackageType>None</WindowsPackageType>
+		<WindowsPackageType>MSIX</WindowsPackageType>
 
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>
@@ -38,32 +38,68 @@
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
 		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
 		<UserSecretsId>4b3211d5-6dec-4702-a59a-779855187194</UserSecretsId>
-		<PackageIcon>todoIcon.png</PackageIcon>
+		<PackageIcon>appicon.png</PackageIcon>
+		<Platforms>AnyCPU;x64</Platforms>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net10.0-maccatalyst|AnyCPU'">
-	  <ApplicationTitle>ToDo AscijA</ApplicationTitle>
+	  <ApplicationTitle>To Do</ApplicationTitle>
+	  <ApplicationIdGuid>E1A9E163-DB1B-48EC-B589-D000D0C2C867</ApplicationIdGuid>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net10.0-maccatalyst|x64'">
+	  <ApplicationTitle>To Do</ApplicationTitle>
 	  <ApplicationIdGuid>E1A9E163-DB1B-48EC-B589-D000D0C2C867</ApplicationIdGuid>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net10.0-windows10.0.19041.0|AnyCPU'">
-	  <ApplicationTitle>ToDo AscijA</ApplicationTitle>
+	  <ApplicationTitle>To Do</ApplicationTitle>
+	  <ApplicationIdGuid>E1A9E163-DB1B-48EC-B589-D000D0C2C867</ApplicationIdGuid>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net10.0-windows10.0.19041.0|x64'">
+	  <ApplicationTitle>To Do</ApplicationTitle>
 	  <ApplicationIdGuid>E1A9E163-DB1B-48EC-B589-D000D0C2C867</ApplicationIdGuid>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net10.0-maccatalyst|AnyCPU'">
-	  <ApplicationTitle>ToDo AscijA</ApplicationTitle>
+	  <ApplicationTitle>To Do</ApplicationTitle>
+	  <ApplicationIdGuid>E1A9E163-DB1B-48EC-B589-D000D0C2C867</ApplicationIdGuid>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net10.0-maccatalyst|x64'">
+	  <ApplicationTitle>To Do</ApplicationTitle>
 	  <ApplicationIdGuid>E1A9E163-DB1B-48EC-B589-D000D0C2C867</ApplicationIdGuid>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net10.0-windows10.0.19041.0|AnyCPU'">
-	  <ApplicationTitle>ToDo AscijA</ApplicationTitle>
+	  <ApplicationTitle>To Do</ApplicationTitle>
 	  <ApplicationIdGuid>E1A9E163-DB1B-48EC-B589-D000D0C2C867</ApplicationIdGuid>
+	  <Optimize>True</Optimize>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net10.0-windows10.0.19041.0|x64'">
+	  <ApplicationTitle>To Do</ApplicationTitle>
+	  <ApplicationIdGuid>E1A9E163-DB1B-48EC-B589-D000D0C2C867</ApplicationIdGuid>
+	  <Optimize>True</Optimize>
+	</PropertyGroup>
+
+	<PropertyGroup>
+	  <PlatformTarget>x64</PlatformTarget>
+	  <PackageCertificateThumbprint>D33BE730F9947907B4650D0144DA251DBAEBDE48</PackageCertificateThumbprint>
+	  <AppxPackageSigningEnabled>True</AppxPackageSigningEnabled>
+	  <GenerateAppInstallerFile>False</GenerateAppInstallerFile>
+	  <AppxPackageSigningTimestampDigestAlgorithm>SHA256</AppxPackageSigningTimestampDigestAlgorithm>
+	  <AppxAutoIncrementPackageRevision>True</AppxAutoIncrementPackageRevision>
+	  <AppxSymbolPackageEnabled>False</AppxSymbolPackageEnabled>
+	  <GenerateTestArtifacts>False</GenerateTestArtifacts>
+	  <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
+	  <SignAssembly>False</SignAssembly>
 	</PropertyGroup>
 
 	<ItemGroup>
 		<!-- App Icon -->
-		<MauiIcon Include="Resources\AppIcon\appicon.png" />
+		<MauiIcon Include="Resources\AppIcon\appicon.png" DeepLinking="false" />
 		<!-- Splash Screen -->
 		<MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#512BD4" BaseSize="128,128" />
 

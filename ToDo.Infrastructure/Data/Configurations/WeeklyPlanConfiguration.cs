@@ -8,9 +8,10 @@ public class WeeklyPlanConfiguration : IEntityTypeConfiguration<WeeklyPlan> {
     public void Configure(EntityTypeBuilder<WeeklyPlan> builder) {
         builder.HasKey(wp => wp.Id);
 
-        builder.Property(wp => wp.Week).IsRequired().HasMaxLength(2);
+        builder.Property(wp => wp.Date)
+            .IsRequired();
 
-        builder.HasIndex(wp => wp.Week).IsUnique();
+        builder.HasIndex(wp => wp.Date).IsUnique();
 
         builder.HasMany(wp => wp.Occurrences)
             .WithOne(o => o.WeeklyPlan)

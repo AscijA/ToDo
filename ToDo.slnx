@@ -1,12 +1,25 @@
 <Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+  </Configurations>
   <Folder Name="/src/">
-    <Project Path="ToDo.Application/ToDo.Application.csproj" Id="ac9dc440-df45-4b4f-bdae-8cba61bbd38a" />
-    <Project Path="ToDo.Domain/ToDo.Domain.csproj" Id="743eff47-5533-4f51-b156-f8d6dcaa1fe4" />
-    <Project Path="ToDo.Infrastructure/ToDo.Infrastructure.csproj" Id="a5252591-8d06-4fa6-b01d-f202f78230e7" />
-    <Project Path="ToDo.Maui/ToDo.Maui.csproj" Id="e336e3b5-c47e-4f61-8fb8-526dfc8649e3">
-      <Deploy Solution="Debug|*" />
+    <Project Path="ToDo.Application/ToDo.Application.csproj" Id="ac9dc440-df45-4b4f-bdae-8cba61bbd38a">
+      <Platform Solution="*|x64" Project="x64" />
     </Project>
-    <Project Path="ToDo.RazorLib/ToDo.RazorLib.csproj" Id="e5dbc355-f667-4ea7-bf95-3151b56c0c72" />
+    <Project Path="ToDo.Domain/ToDo.Domain.csproj" Id="743eff47-5533-4f51-b156-f8d6dcaa1fe4">
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
+    <Project Path="ToDo.Infrastructure/ToDo.Infrastructure.csproj" Id="a5252591-8d06-4fa6-b01d-f202f78230e7">
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
+    <Project Path="ToDo.Maui/ToDo.Maui.csproj" Id="e336e3b5-c47e-4f61-8fb8-526dfc8649e3">
+      <Platform Solution="*|x64" Project="x64" />
+      <Deploy Solution="*|Any CPU" />
+    </Project>
+    <Project Path="ToDo.RazorLib/ToDo.RazorLib.csproj" Id="e5dbc355-f667-4ea7-bf95-3151b56c0c72">
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
   </Folder>
   <Folder Name="/tests/" />
 </Solution>

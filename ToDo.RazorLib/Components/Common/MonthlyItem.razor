@@ -1,0 +1,79 @@
+@inject ISnackbar Snackbar
+@inject IDailyPlanService DailyPlanService
+@inject IMonthlyOccurrenceService MonthlyOccurrenceService
+
+<PlannerItemCard Item="Monthly"
+				 ReadOnly="IsHistory()"
+				 OnDelete="OnDeleteClick"
+				 OnTitleChanged="SaveChanges">
+	<Schedule>
+		<MudNumericField T="int?"
+						  @bind-Value="Monthly.DayOfMonth"
+						  @bind-Value:after="SaveChanges"
+						  Label=""
+						  Margin="Margin.Dense"
+						  Class=@($"date flex-grow-0 {(Monthly.IsDone ? "done-item" : "")}")
+						  Min="1"
+						  Max="31"
+						  HideSpinButtons="true"
+						  MaxLength="2"/>
+	</Schedule>
+	<Details>
+		<MudTextField @bind-Value="Monthly.Description"
+					  @bind-Value:after="SaveChanges"
+					  For="@(() => Monthly.Description)"
+					  Margin="Margin.Dense" />
+	</Details>
+</PlannerItemCard>
+
+@code {
+	[Parameter]
+	public MonthlyItemDTO Monthly { get; set; } = new();
+
+	[Parameter]
+	public EventCallback OnSaved { get; set; }
+
+	[Parameter]
+	public bool AutoFocus { get; set; }
+
+
+	private async Task OnDeleteClick(MouseEventArgs args) {
+		try {
+			await MonthlyOccurrenceService.DeleteTaskAsync(Monthly.OccurrenceId);
+			await OnSaved.InvokeAsync();
+		}
+		catch (Exception ex) {
+			Debug.WriteLine($"Failed to delete: {ex.Message}");
+			Snackbar.Add("Error deleting monthly task", Severity.Error);
+		}
+	}
+
+	private async Task SaveChanges() {
+		var validationContext = new ValidationContext(Monthly);
+		var validationResults = new List<ValidationResult>();
+
+		bool isModelSafeToSave = Validator.TryValidateObject(Monthly, validationContext, validationResults, validateAllProperties: true);
+		if (!isModelSafeToSave) {
+			return;
+		}
+
+		try {
+			if (Monthly.TaskDefinitionId == Guid.Empty) {
+				await DailyPlanService.AddTaskToMonthAsync(Monthly.Date, Monthly);
+				await OnSaved.InvokeAsync();
+				return;
+			}
+
+			await MonthlyOccurrenceService.UpdateAsync(Monthly);
+			await OnSaved.InvokeAsync();
+		}
+		catch (Exception ex) {
+			Debug.WriteLine($"Failed to save monthly item: {ex.Message}");
+			Snackbar.Add("Error saving monthly data", Severity.Error);
+		}
+	}
+
+	private bool IsHistory() {
+		return Monthly.Date < DateOnly.FromDateTime(DateTime.Now).AddDays(1 - DateTime.Now.Day);
+	}
+}

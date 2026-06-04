@@ -1,8 +1,93 @@
 ﻿@using ToDo.RazorLib.Components.Common
-<h6>@Month</h6>
+@inject IDailyPlanService TaskService
+@inject ISettingsService SettingsService
 
+<div class="title">
+   <MudIconButton Icon="@Icons.Material.Filled.NavigateBefore" aria-label="Previous month" Color="Color.Primary" Size="Size.Medium" OnClick="GoToPreviousMonth" />
+
+   <span class="title-date" onclick="@(async () => { await OnDateSelected(DateTime.Now); })">@Date.ToString("MMMM yyyy")</span>
+   <MudIconButton Icon="@Icons.Material.Filled.NavigateNext" aria-label="Next month" Color="Color.Primary" Size="Size.Medium" OnClick="GoToNextMonth" />
+
+   <MudMenu Icon="@Icons.Material.Filled.CalendarMonth" Color="Color.Primary" AnchorOrigin="Origin.BottomCenter" TransformOrigin="Origin.TopCenter">
+      <MudDatePicker PickerVariant="PickerVariant.Static"
+                     Date="selectedDateTime"
+                     DateChanged="OnDateSelected"
+                     AutoClose="true"
+                     ShowWeekNumbers="false"
+                     ShowToolbar="false" />
+   </MudMenu>
+</div>
+
+@foreach (var item in MonthlyItems) {
+   <MonthlyItem @key="item.TaskDefinitionId"
+                Monthly="item"
+                OnSaved="RefreshListAsync" />
+}
+
+@if (Date.Month >= DateTime.Now.Month) {
+   <MonthlyItem Monthly="newItem"
+                @key="Guid.NewGuid()"
+                OnSaved="RefreshListAsync"
+                AutoFocus="shouldAutoFocus" />
+}
 
 @code {
-   [Parameter]
-   public string Month { get; set; }
+   private const string DatePrefKey = "LastViewedMonthlyDate";
+   private MonthlyItemDTO newItem = new();
+   public List<MonthlyItemDTO> MonthlyItems { get; set; } = new();
+   private DateOnly Date { get; set; }
+   private DateTime selectedDateTime;
+   private bool shouldAutoFocus;
+
+   protected override async Task OnInitializedAsync() {
+      var savedDateStr = SettingsService.Get(DatePrefKey, string.Empty);
+      if (!string.IsNullOrEmpty(savedDateStr) && DateOnly.TryParse(savedDateStr, out var parsedDate)) {
+         Date = GetMonthStart(parsedDate);
+      }
+      else {
+         Date = GetMonthStart(DateOnly.FromDateTime(DateTime.Now));
+      }
+
+      selectedDateTime = Date.ToDateTime(new TimeOnly(0, 0));
+      await LoadTasksAsync();
+   }
+
+   private async Task LoadTasksAsync() {
+      MonthlyItems = await TaskService.GetAllMonthlyAsync(Date);
+      newItem = new MonthlyItemDTO { Date = Date };
+   }
+
+   private async Task RefreshListAsync() {
+      shouldAutoFocus = true;
+      await LoadTasksAsync();
+   }
+
+   private async Task GoToPreviousMonth() {
+      Date = Date.AddMonths(-1);
+      await SyncAndReloadAsync();
+   }
+
+   private async Task GoToNextMonth() {
+      Date = Date.AddMonths(1);
+      await SyncAndReloadAsync();
+   }
+
+   private async Task OnDateSelected(DateTime? newDate) {
+      if (newDate.HasValue) {
+         Date = GetMonthStart(DateOnly.FromDateTime(newDate.Value));
+         selectedDateTime = Date.ToDateTime(new TimeOnly(0, 0));
+         await SyncAndReloadAsync();
+      }
+   }
+
+   private async Task SyncAndReloadAsync() {
+      shouldAutoFocus = false;
+      selectedDateTime = Date.ToDateTime(new TimeOnly(0, 0));
+      SettingsService.Set(DatePrefKey, Date.ToString("yyyy-MM-dd"));
+      await LoadTasksAsync();
+   }
+
+   private static DateOnly GetMonthStart(DateOnly date) {
+      return new DateOnly(date.Year, date.Month, 1);
+   }
 }

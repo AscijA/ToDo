@@ -1,0 +1,92 @@
+@inject ISnackbar Snackbar
+@inject IDailyPlanService DailyPlanService
+@inject IWeeklyOccurrenceService WeeklyOccurrenceService
+
+<PlannerItemCard Item="Weekly"
+					  ReadOnly="IsHistory()"
+					  OnDelete="OnDeleteClick"
+					  OnTitleChanged="SaveChanges">
+	<Schedule>
+		<MudSelect T="DayOfWeek?"
+					  @bind-Value="Weekly.WeekDay"
+					  @bind-Value:after="SaveChanges"
+					  Label=""
+					  Margin="Margin.Dense"
+					  Dense="true"
+					  Class="flex-grow-0"
+					  Clearable="true"
+					  FitContent="true"
+					  RelativeWidth="DropdownWidth.Adaptive">
+			<MudSelectItem T="DayOfWeek?" Value="@null">None</MudSelectItem>
+			<MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Sunday">Sunday</MudSelectItem>
+			<MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Monday">Monday</MudSelectItem>
+			<MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Tuesday">Tuesday</MudSelectItem>
+			<MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Wednesday">Wednesday</MudSelectItem>
+			<MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Thursday">Thursday</MudSelectItem>
+			<MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Friday">Friday</MudSelectItem>
+			<MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Saturday">Saturday</MudSelectItem>
+		</MudSelect>
+	</Schedule>
+	<Details>
+		<MudTextField @bind-Value="Weekly.Description"
+						  @bind-Value:after="SaveChanges"
+						  For="@(() => Weekly.Description)"
+						  Margin="Margin.Dense" />
+	</Details>
+</PlannerItemCard>
+
+@code {
+	[Parameter]
+	public WeeklyItemDTO Weekly { get; set; } = new();
+
+	[Parameter]
+	public EventCallback OnSaved { get; set; }
+
+	[Parameter]
+	public bool AutoFocus { get; set; }
+
+	private async Task OnDeleteClick(MouseEventArgs args) {
+		try {
+			await WeeklyOccurrenceService.DeleteTaskAsync(Weekly.OccurrenceId);
+			await OnSaved.InvokeAsync();
+		}
+		catch (Exception ex) {
+			Debug.WriteLine($"Failed to delete: {ex.Message}");
+			Snackbar.Add("Error deleting weekly task", Severity.Error);
+		}
+	}
+
+	private async Task SaveChanges() {
+		var validationContext = new ValidationContext(Weekly);
+		var validationResults = new List<ValidationResult>();
+
+		bool isModelSafeToSave = Validator.TryValidateObject(Weekly, validationContext, validationResults, validateAllProperties: true);
+		if (!isModelSafeToSave) {
+			return;
+		}
+
+		try {
+			if (Weekly.TaskDefinitionId == Guid.Empty) {
+				await DailyPlanService.AddTaskToWeekAsync(Weekly.Date, Weekly);
+				await OnSaved.InvokeAsync();
+				return;
+			}
+
+			await WeeklyOccurrenceService.UpdateAsync(Weekly);
+			await OnSaved.InvokeAsync();
+		}
+		catch (Exception ex) {
+			Debug.WriteLine($"Failed to save weekly item: {ex.Message}");
+			Snackbar.Add("Error saving weekly data", Severity.Error);
+		}
+	}
+
+	private bool IsHistory() {
+		return Weekly.Date < GetWeekStart(DateOnly.FromDateTime(DateTime.Now));
+	}
+
+	private static DateOnly GetWeekStart(DateOnly date) {
+		var diff = (7 + ((int)date.DayOfWeek - (int)DayOfWeek.Monday)) % 7;
+		return date.AddDays(-diff);
+	}
+}

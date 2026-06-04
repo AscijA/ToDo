@@ -1,8 +1,98 @@
-﻿@using ToDo.RazorLib.Components.Common
-<h6>@Week</h6>
+@using ToDo.RazorLib.Components.Common
+@inject IDailyPlanService TaskService
+@inject ISettingsService SettingsService
 
+<div class="title">
+	<MudIconButton Icon="@Icons.Material.Filled.NavigateBefore" aria-label="Previous week" Color="Color.Primary" Size="Size.Medium" OnClick="GoToPreviousWeek" />
+
+	<span class="title-date" onclick="@(async () => { await OnDateSelected(DateTime.Now); })">Week @GetWeekNumber(Date) · @Date.ToString("dd.MM.yyyy")</span>
+	<MudIconButton Icon="@Icons.Material.Filled.NavigateNext" aria-label="Next week" Color="Color.Primary" Size="Size.Medium" OnClick="GoToNextWeek" />
+
+	<MudMenu Icon="@Icons.Material.Filled.CalendarMonth" Color="Color.Primary" AnchorOrigin="Origin.BottomCenter" TransformOrigin="Origin.TopCenter">
+		<MudDatePicker PickerVariant="PickerVariant.Static"
+						Date="selectedDateTime"
+						DateChanged="OnDateSelected"
+						AutoClose="true"
+						ShowWeekNumbers="true"
+						ShowToolbar="false" />
+	</MudMenu>
+</div>
+
+@foreach (var item in WeeklyItems) {
+	<WeeklyItem @key="item.TaskDefinitionId"
+				Weekly="item"
+				OnSaved="RefreshListAsync" />
+}
+
+@if (Date >= GetWeekStart(DateOnly.FromDateTime(DateTime.Now))) {
+	<WeeklyItem Weekly="newItem"
+				@key="Guid.NewGuid()"
+				OnSaved="RefreshListAsync"
+				AutoFocus="shouldAutoFocus" />
+}
 
 @code {
-	[Parameter]
-	public string Week { get; set; }
+	private const string DatePrefKey = "LastViewedWeeklyDate";
+	private WeeklyItemDTO newItem = new();
+	public List<WeeklyItemDTO> WeeklyItems { get; set; } = new();
+	private DateOnly Date { get; set; }
+	private DateTime selectedDateTime;
+	private bool shouldAutoFocus;
+
+	protected override async Task OnInitializedAsync() {
+		var savedDateStr = SettingsService.Get(DatePrefKey, string.Empty);
+		if (!string.IsNullOrEmpty(savedDateStr) && DateOnly.TryParse(savedDateStr, out var parsedDate)) {
+			Date = GetWeekStart(parsedDate);
+		}
+		else {
+			Date = GetWeekStart(DateOnly.FromDateTime(DateTime.Now));
+		}
+
+		selectedDateTime = Date.ToDateTime(new TimeOnly(0, 0));
+		await LoadTasksAsync();
+	}
+
+	private async Task LoadTasksAsync() {
+		WeeklyItems = await TaskService.GetAllWeeklyAsync(Date);
+		newItem = new WeeklyItemDTO { Date = Date };
+	}
+
+	private async Task RefreshListAsync() {
+		shouldAutoFocus = true;
+		await LoadTasksAsync();
+	}
+
+	private async Task GoToPreviousWeek() {
+		Date = Date.AddDays(-7);
+		await SyncAndReloadAsync();
+	}
+
+	private async Task GoToNextWeek() {
+		Date = Date.AddDays(7);
+		await SyncAndReloadAsync();
+	}
+
+	private async Task OnDateSelected(DateTime? newDate) {
+		if (newDate.HasValue) {
+			Date = GetWeekStart(DateOnly.FromDateTime(newDate.Value));
+			selectedDateTime = Date.ToDateTime(new TimeOnly(0, 0));
+			await SyncAndReloadAsync();
+		}
+	}
+
+	private async Task SyncAndReloadAsync() {
+		shouldAutoFocus = false;
+		selectedDateTime = Date.ToDateTime(new TimeOnly(0, 0));
+		SettingsService.Set(DatePrefKey, Date.ToString("yyyy-MM-dd"));
+		await LoadTasksAsync();
+	}
+
+	private static DateOnly GetWeekStart(DateOnly date) {
+		var diff = (7 + ((int)date.DayOfWeek - (int)DayOfWeek.Monday)) % 7;
+		return date.AddDays(-diff);
+	}
+
+	private static int GetWeekNumber(DateOnly date) {
+		return System.Globalization.ISOWeek.GetWeekOfYear(date.ToDateTime(new TimeOnly(0, 0)));
+	}
 }

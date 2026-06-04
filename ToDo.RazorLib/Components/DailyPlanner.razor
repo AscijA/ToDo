@@ -23,17 +23,18 @@
 				  date="Date"
 				  OnSaved="RefreshListAsync" />
 }
-@if(Date >= DateOnly.FromDateTime(DateTime.Now)) {
-<DailyItem Daily="newItem"
-			  date="Date"
-			  OnSaved="RefreshListAsync"
-			  @key="Guid.NewGuid()"
-			  AutoFocus="shouldAutoFocus" />
+@if (Date >= DateOnly.FromDateTime(DateTime.Now)) {
+	<DailyItem Daily="newItem"
+				  date="Date"
+				  OnSaved="RefreshListAsync"
+				  @key="Guid.NewGuid()"
+				  AutoFocus="shouldAutoFocus" />
 }
+
 @code {
 	private DailyItemDTO newItem = new();
 
-	private const string DatePrefKey = "LastViewedPlannerDate";
+	private const string DatePrefKey = "LastViewedDailyDate";
 	public DateOnly Date { get; set; }
 	public List<DailyItemDTO> DailyItems { get; set; } = new();
 
@@ -42,14 +43,14 @@
 	private bool shouldAutoFocus = false;
 
 	protected override async Task OnInitializedAsync() {
-		// string savedDateStr = SettingsService.Get(DatePrefKey, string.Empty);
+		string savedDateStr = SettingsService.Get(DatePrefKey, string.Empty);
 
-		// if (!string.IsNullOrEmpty(savedDateStr) && DateOnly.TryParse(savedDateStr, out var parsedDate)) {
-		//    Date = parsedDate;
-		// }
-		// else {
-		Date = DateOnly.FromDateTime(DateTime.Now);
-		// }
+		if (!string.IsNullOrEmpty(savedDateStr) && DateOnly.TryParse(savedDateStr, out var parsedDate)) {
+			Date = parsedDate;
+		}
+		else {
+			Date = DateOnly.FromDateTime(DateTime.Now);
+		}
 
 		selectedDateTime = Date.ToDateTime(new TimeOnly(0, 0));
 

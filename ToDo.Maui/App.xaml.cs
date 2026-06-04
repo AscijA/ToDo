@@ -19,7 +19,7 @@ public partial class App : Microsoft.Maui.Controls.Application {
 
     protected override Window CreateWindow(IActivationState? activationState) {
         return new Window(new MainPage()) {
-            Title = "ToDo AscijA",
+            Title = "ToDo",
             Width = 1366,
             Height = 768
         };

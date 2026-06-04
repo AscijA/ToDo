@@ -8,6 +8,11 @@ public class WeeklyOccurrenceConfiguration : IEntityTypeConfiguration<WeeklyOccu
     public void Configure(EntityTypeBuilder<WeeklyOccurrence> builder) {
         builder.HasKey(o => o.Id);
 
+        builder.Property(o => o.DayOfWeek)
+            .HasConversion<int?>();
+
+        builder.HasIndex(o => new { o.WeeklyPlanId, o.DayOfWeek, o.TaskDefinitionId });
+
         builder.HasOne(o => o.WeeklyPlan)
             .WithMany(p => p.Occurrences)
             .HasForeignKey(o => o.WeeklyPlanId)

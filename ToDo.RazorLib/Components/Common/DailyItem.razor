@@ -2,14 +2,11 @@
 @inject IDailyPlanService DailyPlanService
 @inject IDailyOccurrenceService DailyOccurrenceService   
 
-<MudForm Model="@Daily" @ref="itemForm" ReadOnly="IsHistory()">
-   <div class="d-flex align-center gap-4">
-      <MudCheckBox @bind-Value="Daily.IsDone"
-                   @bind-Value:after="SaveChanges"
-                   Color="Color.Primary"
-                   Dense="true"
-                   Size="Size.Small" />
-
+<PlannerItemCard Item="Daily"
+              ReadOnly="IsHistory()"
+              OnDelete="OnDeleteClick"
+              OnTitleChanged="SaveChanges">
+   <Schedule>
       <MudTextField @bind-Value="Daily.Timeslot"
                     @bind-Value:after="SaveChanges"
                     For="@(() => Daily.Timeslot)"
@@ -21,33 +18,14 @@
                     Underline="false"
                     Error="timeslotValid"
                     @ref="timeslotRef" />
-
-      <MudTextField @bind-Value="Daily.Title"
-                    @bind-Value:after="SaveChanges"
-                    For="@(() => Daily.Title)"
-                    Label=""
-                    Margin="Margin.Dense"
-                    Underline="@(string.IsNullOrWhiteSpace(Daily.Title))"
-                    Class="@(Daily.IsDone ? "done-item" : "")" />
-
-      <MudIconButton Icon="@Icons.Material.Filled.Info"
-                     Color="Color.Primary"
-                     Size="Size.Small"
-                     OnClick="OnExpandCollapseClick" />
-
-      <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                     Color="Color.Error"
-                     Size="Size.Small"
-                     OnClick="OnDeleteClick" />
-   </div>
-   <MudCollapse @bind-Expanded="@_expanded">
+   </Schedule>
+   <Details>
       <MudTextField @bind-Value="Daily.Description"
                     @bind-Value:after="SaveChanges"
                     For="@(() => Daily.Description)"
                     Margin="Margin.Dense" />
-   </MudCollapse>
-
-</MudForm>
+   </Details>
+</PlannerItemCard>
 
 @code {
    // Parameters
@@ -64,7 +42,6 @@
    public bool AutoFocus { get; set; } = false;
 
    // Private fields
-   private MudForm? itemForm;
    private MudTextField<string>? timeslotRef;
    private IMask timeSlotMask = new PatternMask("00:00");
    private bool timeslotValid;
@@ -96,7 +73,7 @@
    private async Task SaveChanges() {
       if (!string.IsNullOrEmpty(Daily.Timeslot) && Daily.Timeslot.Length < 5) {
          timeslotValid = false;
-         Debug.WriteLine("Timeslot is incomplete. Aborting auto-save.");
+         // Debug.WriteLine("Timeslot is incomplete. Aborting auto-save.");
          return;
       }
       timeslotValid = true;
@@ -108,7 +85,7 @@
       if (isModelSafeToSave) {
          try {
             if (Daily.TaskDefinitionId == Guid.Empty) {
-               Debug.WriteLine("Insert New");
+               // Debug.WriteLine("Insert New");
                await DailyPlanService.AddTaskToDateAsync(date, Daily);
 
                await OnSaved.InvokeAsync();
