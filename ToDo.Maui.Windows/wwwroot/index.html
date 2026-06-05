@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+   <meta charset="utf-8" />
+   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+   <title>ToDo AscijA</title>
+   <base href="/" />
+   <link rel="stylesheet" href="app.css" />
+   <link rel="stylesheet" href="ToDo.Maui.Windows.styles.css" />
+   <link rel="stylesheet" href="_content/ToDo.RazorLib/app.css" />
+   <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" rel="stylesheet" />
+   <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
+   <link rel="icon" href="data:,">
+</head>
+
+<body>
+
+   <div class="status-bar-safe-area"></div>
+
+   <div id="app">
+      <div class="mudblazor-splash">
+         <div class="mud-progress-circular mud-primary-text mud-progress-large mud-progress-indeterminate"
+              role="progressbar"
+              aria-busy="true"
+              aria-valuenow="0"
+              aria-valuemin="0"
+              aria-valuemax="100">
+            <svg class="mud-progress-circular-svg" viewBox="22.5 22.5 43 43">
+               <circle class="mud-progress-circular-circle mud-progress-indeterminate "
+                       cx="44" cy="44" r="20" fill="none" stroke-width="3"></circle>
+            </svg>
+         </div>
+      </div>
+   </div>
+
+   <div id="blazor-error-ui" data-nosnippet>
+      An unhandled error has occurred.
+      <a href="." class="reload">Reload</a>
+      <span class="dismiss">🗙</span>
+   </div>
+
+   <script src="_framework/blazor.webview.js" autostart="false"></script>
+
+   <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+   <style>
+      .mudblazor-splash {
+         min-height: 100vh;
+         display: flex;
+         flex-direction: column;
+         align-items: center;
+         justify-content: center;
+         background: #282C34;
+      }
+      html, body {
+         height: 100%;
+         margin: 0;
+         background: #282C34;
+         color: #C678DD;
+      }
+      .mud-splash .mud-progress-circular-circle {
+         stroke: #C678DD !important;
+      }
+   </style>
+</body>
+
+</html>

@@ -13,7 +13,10 @@
     <Project Path="ToDo.Infrastructure/ToDo.Infrastructure.csproj" Id="a5252591-8d06-4fa6-b01d-f202f78230e7">
       <Platform Solution="*|x64" Project="x64" />
     </Project>
-    <Project Path="ToDo.Maui/ToDo.Maui.csproj" Id="e336e3b5-c47e-4f61-8fb8-526dfc8649e3">
+    <Project Path="ToDo.Maui.Android/ToDo.Maui.Android.csproj" Id="fddc9d9f-cfb8-4c51-bbc4-a0b84694d115">
+      <Deploy Solution="*|Any CPU" />
+    </Project>
+    <Project Path="ToDo.Maui.Windows/ToDo.Maui.Windows.csproj" Id="e336e3b5-c47e-4f61-8fb8-526dfc8649e3">
       <Platform Solution="*|x64" Project="x64" />
       <Deploy Solution="*|Any CPU" />
     </Project>
