@@ -25,10 +25,10 @@ public class WeeklyOccurrenceService : IWeeklyOccurrenceService {
 
         var color = await context.TaskListItems
             .Where(i => i.TaskDefinitionId == weeklyItem.TaskDefinitionId)
-            .Select(i => i.TaskList.Color)
+            .Select(i => i.TaskList!.Color)
             .FirstOrDefaultAsync();
 
-        return weeklyItem.ToWeeklyItem(color);
+        return weeklyItem!.ToWeeklyItem(color);
     }
 
     public async Task<WeeklyItemDTO> UpdateAsync(WeeklyItemDTO dto) {
@@ -37,8 +37,9 @@ public class WeeklyOccurrenceService : IWeeklyOccurrenceService {
             .Include(x => x.TaskDefinition)
             .Include(x => x.WeeklyPlan)
             .FirstOrDefaultAsync(x => x.Id == dto.OccurrenceId);
-        if (weeklyItem == null) {
-            throw new Exception("Weekly item not found");
+        
+        if (weeklyItem == null || weeklyItem.TaskDefinition == null) {
+            throw new Exception("Weekly item or task definition not found");
         }
 
         weeklyItem.TaskDefinition.Title = dto.Title;
@@ -54,10 +55,10 @@ public class WeeklyOccurrenceService : IWeeklyOccurrenceService {
 
         var color = await context.TaskListItems
             .Where(i => i.TaskDefinitionId == weeklyItem.TaskDefinitionId)
-            .Select(i => i.TaskList.Color)
+            .Select(i => i.TaskList!.Color)
             .FirstOrDefaultAsync();
 
-        return weeklyItem.ToWeeklyItem(color);
+        return weeklyItem!.ToWeeklyItem(color);
     }
 
     public async Task ToggleTaskAsync(Guid occurenceId) {

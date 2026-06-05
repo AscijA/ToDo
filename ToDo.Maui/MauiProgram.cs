@@ -10,6 +10,7 @@ using Microsoft.Maui.LifecycleEvents;
 
 #if WINDOWS
 using Microsoft.UI.Windowing;
+using ToDo.Maui.Platforms.Windows;
 using WinRT.Interop;
 using Microsoft.UI;
 #endif
@@ -31,13 +32,24 @@ public static class MauiProgram {
                     var windowId = Win32Interop.GetWindowIdFromWindow(hwnd);
                     var appWindow = AppWindow.GetFromWindowId(windowId);
 
-                    var iconPath = Path.Combine(
-                        AppContext.BaseDirectory,
-                        "Platforms",
-                        "Windows",
-                        "appicon.ico");
+                    const string appTitle = "To Do";
+                    window.Title = appTitle;
+                    appWindow.Title = appTitle;
 
+                    var iconPath = GetWindowsIconPath();
                     appWindow.SetIcon(iconPath);
+                    TrayWindowService.Initialize(window, appWindow, hwnd, iconPath);
+
+                    appWindow.Closing += (sender, args) => {
+                        var mauiApp = Microsoft.Maui.Controls.Application.Current;
+                        var settings = mauiApp?.Handler?.MauiContext?.Services.GetService<ISettingsService>();
+                        var minimizeToTray = settings?.Get("MinimizeToTray", "false") == "true";
+
+                        if (minimizeToTray) {
+                            args.Cancel = true;
+                            TrayWindowService.HideWindow();
+                        }
+                    };
                 });
             });
 #endif
@@ -63,4 +75,17 @@ public static class MauiProgram {
         builder.Services.AddSingleton<ISettingsService, MauiSettingsService>();
         return builder.Build();
     }
+
+#if WINDOWS
+    private static string GetWindowsIconPath() {
+        var baseDirectory = AppContext.BaseDirectory;
+        var candidates = new[] {
+            Path.Combine(baseDirectory, "appicon.ico"),
+            Path.Combine(baseDirectory, "Resources", "AppIcon", "appicon.ico"),
+            Path.Combine(baseDirectory, "AppX", "appicon.ico")
+        };
+
+        return candidates.FirstOrDefault(File.Exists) ?? candidates[0];
+    }
+#endif
 }

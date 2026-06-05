@@ -1,0 +1,99 @@
+#if WINDOWS
+using H.NotifyIcon;
+using Microsoft.UI.Windowing;
+using System.Drawing;
+using WinUiControls = Microsoft.UI.Xaml.Controls;
+
+namespace ToDo.Maui.Platforms.Windows;
+
+internal static class TrayWindowService {
+    private static Microsoft.UI.Xaml.Window? window;
+    private static AppWindow? appWindow;
+    private static TaskbarIcon? taskbarIcon;
+    private static Icon? icon;
+    private static bool isExiting;
+
+    public static void Initialize(Microsoft.UI.Xaml.Window createdWindow, AppWindow createdAppWindow, IntPtr createdHwnd, string iconPath) {
+        window = createdWindow;
+        appWindow = createdAppWindow;
+
+        taskbarIcon?.Dispose();
+        icon?.Dispose();
+
+        icon = new Icon(iconPath);
+
+        taskbarIcon = new TaskbarIcon {
+            ToolTipText = "To Do",
+            Icon = icon,
+            NoLeftClickDelay = true,
+            ContextFlyout = CreateTrayMenu(),
+            DoubleClickCommand = new Command(RestoreWindow)
+        };
+
+        taskbarIcon.ForceCreate();
+    }
+
+    public static void HideWindow() {
+        if (!isExiting) {
+            appWindow?.Hide();
+        }
+    }
+
+    public static void RestoreWindow() {
+        appWindow?.Show();
+        window?.Activate();
+    }
+
+    private static WinUiControls.MenuFlyout CreateTrayMenu() {
+        var menu = new WinUiControls.MenuFlyout();
+
+        var showItem = new WinUiControls.MenuFlyoutItem {
+            Text = "Show",
+            Command = new Command(RestoreWindow)
+        };
+
+        var syncItem = new WinUiControls.MenuFlyoutItem {
+            Text = "Sync",
+            Command = new Command(Sync)
+        };
+
+        var exitItem = new WinUiControls.MenuFlyoutItem {
+            Text = "Exit",
+            Command = new Command(ExitApplication)
+        };
+
+        menu.Items.Add(showItem);
+        menu.Items.Add(syncItem);
+        menu.Items.Add(new WinUiControls.MenuFlyoutSeparator());
+        menu.Items.Add(exitItem);
+        return menu;
+    }
+
+    private static void Sync() {
+    }
+
+    public static void ExitApplication() {
+        isExiting = true;
+
+        if (window?.DispatcherQueue is { } dispatcherQueue) {
+            dispatcherQueue.TryEnqueue(FinishExit);
+            return;
+        }
+
+        FinishExit();
+    }
+
+    private static void FinishExit() {
+        taskbarIcon?.Dispose();
+        icon?.Dispose();
+
+        taskbarIcon = null;
+        icon = null;
+
+        appWindow?.Destroy();
+        Microsoft.Maui.Controls.Application.Current?.Quit();
+        Microsoft.UI.Xaml.Application.Current.Exit();
+    }
+}
+
+#endif

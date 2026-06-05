@@ -40,6 +40,7 @@
             <MudText Typo="Typo.h6">Layout</MudText>
             
             <MudSwitch T="bool" @bind-Value="_bigOnLeft" Label="Big Container on Left" Color="Color.Primary" />
+            <MudSwitch T="bool" @bind-Value="_minimizeToTray" Label="Minimize to Tray on Close" Color="Color.Primary" />
 
             <MudSelect T="string" @bind-Value="_slotBig" Label="Big Slot">
                 <MudSelectItem Value="@("Daily")">Daily Planner</MudSelectItem>
@@ -76,6 +77,7 @@
     private string _slotBig = "Daily";
     private string _slotSmallTop = "Weekly";
     private string _slotSmallBottom = "Monthly";
+    private bool _minimizeToTray = false;
 
     private string _customPrimary = "#C678DD";
     private string _customSecondary = "#61AFEF";
@@ -86,6 +88,7 @@
         _appearance = SettingsService.Get("Appearance", "System");
         _themeName = SettingsService.Get("Theme", "ODP");
         _bigOnLeft = SettingsService.Get("BigOnLeft", "true") == "true";
+        _minimizeToTray = SettingsService.Get("MinimizeToTray", "false") == "true";
         _slotBig = SettingsService.Get("Slot_Big", "Daily");
         _slotSmallTop = SettingsService.Get("Slot_SmallTop", "Weekly");
         _slotSmallBottom = SettingsService.Get("Slot_SmallBottom", "Monthly");
@@ -102,6 +105,7 @@
         SettingsService.Set("Appearance", _appearance);
         SettingsService.Set("Theme", _themeName);
         SettingsService.Set("BigOnLeft", _bigOnLeft.ToString().ToLower());
+        SettingsService.Set("MinimizeToTray", _minimizeToTray.ToString().ToLower());
         SettingsService.Set("Slot_Big", _slotBig);
         SettingsService.Set("Slot_SmallTop", _slotSmallTop);
         SettingsService.Set("Slot_SmallBottom", _slotSmallBottom);

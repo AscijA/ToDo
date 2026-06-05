@@ -5,13 +5,6 @@
              x:Class="ToDo.Maui.App">
     <Application.Resources>
         <ResourceDictionary>
-
-            <!--
-                For information about styling .NET MAUI pages
-                please refer to the documentation:
-                https://go.microsoft.com/fwlink/?linkid=2282329
-            -->
-
         </ResourceDictionary>
     </Application.Resources>
 </Application>

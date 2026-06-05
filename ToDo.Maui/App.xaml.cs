@@ -1,10 +1,11 @@
-﻿using ToDo.Maui.Services;
+using ToDo.Maui.Services;
 
 namespace ToDo.Maui;
 
 public partial class App : Microsoft.Maui.Controls.Application {
     public App(DatabaseInitializer initializer) {
         InitializeComponent();
+
         Task.Run(async () => {
             try {
                 await initializer.InitializeAsync();
@@ -17,9 +18,13 @@ public partial class App : Microsoft.Maui.Controls.Application {
 
     protected override Window CreateWindow(IActivationState? activationState) {
         return new Window(new MainPage()) {
-            Title = "ToDo",
+            Title = "To Do",
             Width = 1366,
-            Height = 768
+            Height = 768,
+            TitleBar = new TitleBar {
+                Title = "To Do",
+                Icon = "Resources/AppIcon/appicon.ico"
+            }
         };
     }
 }

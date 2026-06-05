@@ -22,10 +22,10 @@ public class DailyOccurrenceService : IDailyOccurrenceService {
 
         var color = await context.TaskListItems
             .Where(i => i.TaskDefinitionId == dailyItem.TaskDefinitionId)
-            .Select(i => i.TaskList.Color)
+            .Select(i => i.TaskList!.Color)
             .FirstOrDefaultAsync();
 
-        return dailyItem.ToDailyItem(color);
+        return dailyItem!.ToDailyItem(color);
     }
 
     public async Task<DailyItemDTO> UpdateAsync(DailyItemDTO dto) {
@@ -33,8 +33,9 @@ public class DailyOccurrenceService : IDailyOccurrenceService {
         var dailyItem = await context.DailyOccurrences
             .Include(x => x.TaskDefinition)
             .FirstOrDefaultAsync(x => x.Id == dto.OccurrenceId);
-        if (dailyItem == null) {
-            throw new Exception("Daily item not found");
+        
+        if (dailyItem == null || dailyItem.TaskDefinition == null) {
+            throw new Exception("Daily item or task definition not found");
         }
 
         dailyItem.TaskDefinition.Title = dto.Title;
@@ -49,10 +50,10 @@ public class DailyOccurrenceService : IDailyOccurrenceService {
         
         var color = await context.TaskListItems
             .Where(i => i.TaskDefinitionId == dailyItem.TaskDefinitionId)
-            .Select(i => i.TaskList.Color)
+            .Select(i => i.TaskList!.Color)
             .FirstOrDefaultAsync();
 
-        return dailyItem.ToDailyItem(color);
+        return dailyItem!.ToDailyItem(color);
     }
 
     public async Task ToggleTaskAsync(Guid occurenceId) {

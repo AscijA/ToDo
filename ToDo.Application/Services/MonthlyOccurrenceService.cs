@@ -25,10 +25,10 @@ public class MonthlyOccurrenceService : IMonthlyOccurrenceService {
 
         var color = await context.TaskListItems
             .Where(i => i.TaskDefinitionId == monthlyItem.TaskDefinitionId)
-            .Select(i => i.TaskList.Color)
+            .Select(i => i.TaskList!.Color)
             .FirstOrDefaultAsync();
 
-        return monthlyItem.ToMonthlyItem(color);
+        return monthlyItem!.ToMonthlyItem(color);
     }
 
     public async Task<MonthlyItemDTO> UpdateAsync(MonthlyItemDTO dto) {
@@ -37,8 +37,9 @@ public class MonthlyOccurrenceService : IMonthlyOccurrenceService {
             .Include(x => x.TaskDefinition)
             .Include(x => x.MonthlyPlan)
             .FirstOrDefaultAsync(x => x.Id == dto.OccurrenceId);
-        if (monthlyItem == null) {
-            throw new Exception("Monthly item not found");
+        
+        if (monthlyItem == null || monthlyItem.TaskDefinition == null) {
+            throw new Exception("Monthly item or task definition not found");
         }
 
         monthlyItem.TaskDefinition.Title = dto.Title;
@@ -54,10 +55,10 @@ public class MonthlyOccurrenceService : IMonthlyOccurrenceService {
 
         var color = await context.TaskListItems
             .Where(i => i.TaskDefinitionId == monthlyItem.TaskDefinitionId)
-            .Select(i => i.TaskList.Color)
+            .Select(i => i.TaskList!.Color)
             .FirstOrDefaultAsync();
 
-        return monthlyItem.ToMonthlyItem(color);
+        return monthlyItem!.ToMonthlyItem(color);
     }
 
     public async Task ToggleTaskAsync(Guid occurenceId) {
