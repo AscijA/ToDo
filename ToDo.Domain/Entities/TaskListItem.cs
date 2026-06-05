@@ -9,5 +9,7 @@ public class TaskListItem : EntityBase {
     public Guid TaskListId { get; set; }
     public TaskList? TaskList { get; set; }
 
+    public int Position { get; set; }
+
     public TaskListItem() { }
 }

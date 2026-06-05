@@ -1,30 +1,44 @@
 @inject ITaskListService ListService
 @inject IDialogService DialogService
+@inject IJSRuntime JSRuntime
+@using Microsoft.JSInterop
 @using ToDo.Application.Contracts.DTOs
 @using ToDo.RazorLib.Components.TaskList
+@implements IAsyncDisposable
 
 <div class="tasklist-view mud-height-full">
     <div class="d-flex align-center justify-space-between mb-4">
-        <MudText Typo="Typo.h5" 
-                 Style="cursor: pointer;" 
+        <MudText Typo="Typo.h5"
+                 Style="cursor: pointer;"
                  @onclick="EditList">
             @List?.Name
         </MudText>
-        <MudIconButton Icon="@Icons.Material.Filled.Delete" 
-                       Color="Color.Error" 
+        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                       Color="Color.Error"
                        OnClick="DeleteList" />
     </div>
 
     <div class="tasklist-items">
-        @if (Items != null) {
-            @foreach (var it in Items) {
-                <TaskListItem @key="it.Id" Item="it" OnDeleted="LoadListAsync" />
-            }
+        @if (Items.Count > 0) {
+            <div class="tasklist-item-dropzone" @ref="itemsContainer">
+                @foreach (var item in Items) {
+                    <div class="tasklist-draggable-row @(draggedItemId == item.Id ? "tasklist-item-dragging" : "")"
+                         @key="item.Id"
+                         data-task-list-item-id="@item.Id">
+                        <div class="tasklist-drag-handle" title="Drag to reorder">
+                            <MudIcon Icon="@Icons.Material.Filled.DragIndicator" Size="Size.Small" />
+                        </div>
+                        <div class="tasklist-draggable-content">
+                            <TaskListItem Item="item" OnDeleted="LoadListAsync" />
+                        </div>
+                    </div>
+                }
+            </div>
         }
-        
-        <TaskListItem Item="newItem" 
-                      ListId="ListId" 
-                      OnSaved="RefreshListAsync" 
+
+        <TaskListItem Item="newItem"
+                      ListId="ListId"
+                      OnSaved="RefreshListAsync"
                       @key="newItemKey"
                       AutoFocus="shouldAutoFocus" />
     </div>
@@ -37,31 +51,105 @@
 
     private TaskListDto? List;
     private List<TaskListItemDto> Items = new();
-    
-    private TaskListItemDto newItem = new(Guid.Empty, Guid.Empty, "", false);
+    private TaskListItemDto newItem = new(Guid.Empty, Guid.Empty, "", false, 0);
     private Guid newItemKey = Guid.NewGuid();
     private bool shouldAutoFocus = false;
+
+    private ElementReference itemsContainer;
+    private DotNetObjectReference<TaskList>? dotNetReference;
+    private IJSObjectReference? reorderModule;
+    private IJSObjectReference? reorderInstance;
+    private Guid? draggedItemId;
+    private bool shouldAttachReorder;
 
     protected override async Task OnParametersSetAsync() {
         await LoadListAsync();
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender) {
+        if (firstRender) {
+            dotNetReference = DotNetObjectReference.Create(this);
+            reorderModule = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./_content/ToDo.RazorLib/tasklist-reorder.js");
+        }
+
+        if (shouldAttachReorder && reorderModule != null && dotNetReference != null) {
+            shouldAttachReorder = false;
+            if (reorderInstance != null) {
+                await reorderInstance.InvokeVoidAsync("dispose");
+                await reorderInstance.DisposeAsync();
+            }
+
+            reorderInstance = await reorderModule.InvokeAsync<IJSObjectReference>("attachTaskListReorder", itemsContainer, dotNetReference);
+        }
+    }
+
     private async Task LoadListAsync() {
         List = await ListService.GetByIdAsync(ListId);
         if (List != null) {
-            Items = List.Items;
+            Items = List.Items.OrderBy(item => item.Position).ToList();
+            shouldAttachReorder = Items.Count > 0;
         }
     }
 
     private async Task RefreshListAsync() {
         shouldAutoFocus = true;
-        newItem = new(Guid.Empty, Guid.Empty, "", false);
+        newItem = new(Guid.Empty, Guid.Empty, "", false, 0);
         newItemKey = Guid.NewGuid();
         await LoadListAsync();
     }
 
+    [JSInvokable]
+    public async Task MoveItemById(string sourceItemId, string targetItemId, string placement) {
+        if (!Guid.TryParse(sourceItemId, out var sourceId) || !Guid.TryParse(targetItemId, out var targetId) || sourceId == targetId) {
+            return;
+        }
+
+        draggedItemId = sourceId;
+        var sourceIndex = Items.FindIndex(item => item.Id == sourceId);
+        var targetIndex = Items.FindIndex(item => item.Id == targetId);
+        if (sourceIndex < 0 || targetIndex < 0) {
+            draggedItemId = null;
+            return;
+        }
+
+        var draggedItem = Items[sourceIndex];
+        Items.RemoveAt(sourceIndex);
+        if (sourceIndex < targetIndex) {
+            targetIndex--;
+        }
+
+        if (placement == "after") {
+            targetIndex++;
+        }
+
+        targetIndex = Math.Clamp(targetIndex, 0, Items.Count);
+        Items.Insert(targetIndex, draggedItem);
+
+        Items = Items
+            .Select((item, index) => item with { Position = index })
+            .ToList();
+
+        await ListService.UpdateOrderAsync(ListId, Items.Select(item => item.Id).ToList());
+        draggedItemId = null;
+        shouldAttachReorder = true;
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void SetDraggingItem(string? itemId) {
+        draggedItemId = Guid.TryParse(itemId, out var id) ? id : null;
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void ClearDraggingItem() {
+        draggedItemId = null;
+        StateHasChanged();
+    }
+
     private async Task EditList() {
-        if (List == null) return;
+        if (List == null)
+            return;
 
         var parameters = new DialogParameters<TaskListModal> {
             { x => x.Name, List.Name },
@@ -80,8 +168,22 @@
     }
 
     private async Task DeleteList() {
-        if (List == null) return;
+        if (List == null)
+            return;
         await ListService.DeleteAsync(List.Id);
         await OnDeleted.InvokeAsync();
+    }
+
+    public async ValueTask DisposeAsync() {
+        if (reorderInstance != null) {
+            await reorderInstance.InvokeVoidAsync("dispose");
+            await reorderInstance.DisposeAsync();
+        }
+
+        if (reorderModule != null) {
+            await reorderModule.DisposeAsync();
+        }
+
+        dotNetReference?.Dispose();
     }
 }

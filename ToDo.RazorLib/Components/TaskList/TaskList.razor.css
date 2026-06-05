@@ -1,0 +1,54 @@
+.tasklist-item-dropzone {
+   display: flex;
+   flex-direction: column;
+   gap: 4px;
+   width: 100%;
+}
+
+.tasklist-draggable-row {
+   display: flex;
+   align-items: center;
+   gap: 6px;
+   width: 100%;
+   border-radius: 4px;
+}
+
+.tasklist-drag-handle {
+   align-self: stretch;
+   display: flex;
+   align-items: center;
+   color: var(--mud-palette-text-secondary);
+   cursor: grab;
+   padding: 0 2px;
+   user-select: none;
+   touch-action: none;
+}
+
+   .tasklist-drag-handle:active {
+      cursor: grabbing;
+   }
+
+.tasklist-draggable-content {
+   flex: 1;
+   min-width: 0;
+}
+
+.tasklist-item-dragging {
+   opacity: .65;
+}
+
+.tasklist-drop-target {
+   opacity: .85;
+}
+
+.tasklist-drop-placeholder {
+   min-height: 40px;
+   border-width: 2px;
+   border-style: dashed;
+   border-color: var(--mud-palette-primary);
+   border-radius: 4px;
+   background-color: rgba(89, 74, 226, .12);
+   box-sizing: border-box;
+   pointer-events: none;
+   width: 100%;
+}

@@ -11,4 +11,5 @@ public interface ITaskListService {
     Task<TaskListItemDto> AddItemAsync(Guid listId, string text);
     Task UpdateItemAsync(TaskListItemDto item);
     Task DeleteItemAsync(Guid itemId);
+    Task UpdateOrderAsync(Guid listId, List<Guid> itemIds);
 }

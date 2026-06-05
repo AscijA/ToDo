@@ -24,7 +24,7 @@ public class TaskListService : ITaskListService {
             l.Name, 
             l.Color, 
             l.Description, 
-            l.Items.Select(i => new TaskListItemDto(i.Id, i.TaskDefinitionId, i.TaskDefinition.Title, i.IsDone)).ToList()
+            l.Items.OrderBy(i => i.Position).Select(i => new TaskListItemDto(i.Id, i.TaskDefinitionId, i.TaskDefinition.Title, i.IsDone, i.Position)).ToList()
         )).ToList();
     }
 
@@ -40,7 +40,7 @@ public class TaskListService : ITaskListService {
             l.Name, 
             l.Color, 
             l.Description, 
-            l.Items.Select(i => new TaskListItemDto(i.Id, i.TaskDefinitionId, i.TaskDefinition.Title, i.IsDone)).ToList()
+            l.Items.OrderBy(i => i.Position).Select(i => new TaskListItemDto(i.Id, i.TaskDefinitionId, i.TaskDefinition.Title, i.IsDone, i.Position)).ToList()
         );
     }
 
@@ -73,13 +73,18 @@ public class TaskListService : ITaskListService {
     public async Task<TaskListItemDto> AddItemAsync(Guid listId, string text) {
         using var ctx = await _contextFactory.CreateDbContextAsync();
         
+        var maxPosition = await ctx.TaskListItems
+            .Where(i => i.TaskListId == listId)
+            .Select(i => (int?)i.Position)
+            .MaxAsync() ?? -1;
+
         var taskDef = new TaskDefinition { Title = text, Description = "" };
         ctx.TaskDefinitions.Add(taskDef);
 
-        var li = new TaskListItem { TaskDefinition = taskDef, TaskListId = listId };
+        var li = new TaskListItem { TaskDefinition = taskDef, TaskListId = listId, Position = maxPosition + 1 };
         ctx.TaskListItems.Add(li);
         await ctx.SaveChangesAsync();
-        return new TaskListItemDto(li.Id, taskDef.Id, taskDef.Title, li.IsDone);
+        return new TaskListItemDto(li.Id, taskDef.Id, taskDef.Title, li.IsDone, li.Position);
     }
 
     public async Task UpdateItemAsync(TaskListItemDto item) {
@@ -88,6 +93,7 @@ public class TaskListService : ITaskListService {
         if (li == null) return;
         li.TaskDefinition.Title = item.Text;
         li.IsDone = item.IsDone;
+        li.Position = item.Position;
 
         // Synchronization logic
         var taskDefId = li.TaskDefinitionId;
@@ -110,6 +116,20 @@ public class TaskListService : ITaskListService {
         var it = await ctx.TaskListItems.FindAsync(itemId);
         if (it == null) return;
         ctx.TaskListItems.Remove(it);
+        await ctx.SaveChangesAsync();
+    }
+
+    public async Task UpdateOrderAsync(Guid listId, List<Guid> itemIds) {
+        using var ctx = await _contextFactory.CreateDbContextAsync();
+        var items = await ctx.TaskListItems.Where(i => i.TaskListId == listId).ToListAsync();
+
+        for (int i = 0; i < itemIds.Count; i++) {
+            var item = items.FirstOrDefault(x => x.Id == itemIds[i]);
+            if (item != null) {
+                item.Position = i;
+            }
+        }
+
         await ctx.SaveChangesAsync();
     }
 }
