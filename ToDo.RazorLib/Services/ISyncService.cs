@@ -5,7 +5,7 @@ public interface ISyncService {
     void SaveLocalDevice(SyncDeviceIdentity identity);
     Task<SyncDiscoveryResult> DiscoverAvailableDevicesAsync(CancellationToken cancellationToken = default);
     IReadOnlyList<PairedSyncDevice> GetPairedDevices();
-    SyncPairingSession StartPairing(AvailableSyncDevice device);
-    void ConfirmPairing(SyncPairingSession session);
+    Task<SyncPairingSession?> StartPairingAsync(AvailableSyncDevice device, string localAddress, CancellationToken cancellationToken = default);
+    Task<bool> ConfirmPairingAsync(SyncPairingSession session, string localAddress, CancellationToken cancellationToken = default);
     void RemovePairedDevice(string deviceId);
 }

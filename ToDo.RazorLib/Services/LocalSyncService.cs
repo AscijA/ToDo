@@ -1,4 +1,6 @@
 using System.Security.Cryptography;
+using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 
 namespace ToDo.RazorLib.Services;
@@ -58,38 +60,86 @@ public sealed class LocalSyncService : ISyncService {
         return LoadPairedDevices();
     }
 
-    public SyncPairingSession StartPairing(AvailableSyncDevice device) {
-        var code = RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
-        code = $"{code[..3]}-{code[3..]}";
+    public async Task<SyncPairingSession?> StartPairingAsync(
+        AvailableSyncDevice device,
+        string localAddress,
+        CancellationToken cancellationToken = default) {
+        var localDevice = GetLocalDevice();
+        using var httpClient = CreatePairingClient();
+
+        var response = await PostJsonAsync(
+            httpClient,
+            $"http://{device.Address}/sync/pair/start",
+            new SyncPairStartRequest(localDevice.DeviceId, localDevice.DeviceName, localAddress),
+            cancellationToken);
+
+        if (!response.IsSuccessStatusCode) {
+            var error = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new InvalidOperationException($"Pair start failed: {(int)response.StatusCode} {response.ReasonPhrase}. {error}");
+        }
+
+        var pairStart = await response.Content.ReadFromJsonAsync<SyncPairStartResponse>(cancellationToken);
+        if (pairStart == null || string.IsNullOrWhiteSpace(pairStart.SessionId)) {
+            throw new InvalidOperationException("Pair start returned an invalid response.");
+        }
 
         return new SyncPairingSession(
-            device.DeviceId,
-            device.DeviceName,
-            device.Address,
-            code,
-            DateTimeOffset.Now.AddMinutes(5),
+            pairStart.DeviceId,
+            pairStart.DeviceName,
+            pairStart.Address,
+            pairStart.SessionId,
+            pairStart.VerificationCode,
+            pairStart.ExpiresAt,
             GenerateTrustToken());
     }
 
-    public void ConfirmPairing(SyncPairingSession session) {
+    public async Task<bool> ConfirmPairingAsync(
+        SyncPairingSession session,
+        string localAddress,
+        CancellationToken cancellationToken = default) {
         if (session.ExpiresAt < DateTimeOffset.Now) {
-            return;
+            return false;
+        }
+
+        var localDevice = GetLocalDevice();
+        using var httpClient = CreatePairingClient();
+        var response = await PostJsonAsync(
+            httpClient,
+            $"http://{session.Address}/sync/pair/confirm",
+            new SyncPairConfirmRequest(
+                session.RemoteSessionId,
+                session.VerificationCode,
+                localDevice.DeviceId,
+                localDevice.DeviceName,
+                localAddress,
+                session.TrustToken),
+            cancellationToken);
+
+        if (!response.IsSuccessStatusCode) {
+            var error = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new InvalidOperationException($"Pair confirm failed: {(int)response.StatusCode} {response.ReasonPhrase}. {error}");
+        }
+
+        var pairConfirm = await response.Content.ReadFromJsonAsync<SyncPairConfirmResponse>(cancellationToken);
+        if (pairConfirm == null || string.IsNullOrWhiteSpace(pairConfirm.TrustToken)) {
+            return false;
         }
 
         var devices = LoadPairedDevices()
-            .Where(device => !string.Equals(device.DeviceId, session.DeviceId, StringComparison.OrdinalIgnoreCase))
+            .Where(device => !string.Equals(device.DeviceId, pairConfirm.DeviceId, StringComparison.OrdinalIgnoreCase))
             .ToList();
 
         devices.Add(new PairedSyncDevice(
-            session.DeviceId,
-            session.DeviceName,
-            session.Address,
+            pairConfirm.DeviceId,
+            pairConfirm.DeviceName,
+            pairConfirm.Address,
             DateTimeOffset.Now,
             null,
             true,
-            session.TrustToken));
+            pairConfirm.TrustToken));
 
         SavePairedDevices(devices);
+        return true;
     }
 
     public void RemovePairedDevice(string deviceId) {
@@ -127,5 +177,21 @@ public sealed class LocalSyncService : ISyncService {
         Span<byte> bytes = stackalloc byte[32];
         RandomNumberGenerator.Fill(bytes);
         return Convert.ToBase64String(bytes);
+    }
+
+    private static HttpClient CreatePairingClient() {
+        return new HttpClient {
+            Timeout = TimeSpan.FromSeconds(5)
+        };
+    }
+
+    private static async Task<HttpResponseMessage> PostJsonAsync<T>(
+        HttpClient httpClient,
+        string requestUri,
+        T body,
+        CancellationToken cancellationToken) {
+        var json = JsonSerializer.Serialize(body, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        using var content = new StringContent(json, Encoding.UTF8, "application/json");
+        return await httpClient.PostAsync(requestUri, content, cancellationToken);
     }
 }

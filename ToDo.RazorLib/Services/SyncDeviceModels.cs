@@ -26,6 +26,7 @@ public sealed record SyncPairingSession(
     string DeviceId,
     string DeviceName,
     string Address,
+    string RemoteSessionId,
     string VerificationCode,
     DateTimeOffset ExpiresAt,
     string TrustToken);
@@ -45,3 +46,30 @@ public sealed record SyncHelloResponse(
 public sealed record SyncDiscoveryResult(
     IReadOnlyList<AvailableSyncDevice> Devices,
     string? Message);
+
+public sealed record SyncPairStartRequest(
+    string DeviceId,
+    string DeviceName,
+    string Address);
+
+public sealed record SyncPairStartResponse(
+    string DeviceId,
+    string DeviceName,
+    string Address,
+    string SessionId,
+    string VerificationCode,
+    DateTimeOffset ExpiresAt);
+
+public sealed record SyncPairConfirmRequest(
+    string SessionId,
+    string VerificationCode,
+    string DeviceId,
+    string DeviceName,
+    string Address,
+    string TrustToken);
+
+public sealed record SyncPairConfirmResponse(
+    string DeviceId,
+    string DeviceName,
+    string Address,
+    string TrustToken);

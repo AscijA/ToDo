@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Runtime.Versioning;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
@@ -12,11 +13,17 @@ public sealed class LocalHttpSyncTransportService : ISyncTransportService {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly object gate = new();
+    private readonly ISettingsService settings;
+    private readonly Dictionary<string, PendingPairing> pendingPairings = new(StringComparer.OrdinalIgnoreCase);
     private TcpListener? listener;
     private CancellationTokenSource? listenerCancellation;
     private Task? listenerTask;
     private SyncDeviceIdentity? currentIdentity;
     private SyncTransportStatus status = new(false, null, null, null, null);
+
+    public LocalHttpSyncTransportService(ISettingsService settings) {
+        this.settings = settings;
+    }
 
     public SyncTransportStatus GetStatus() {
         lock (gate) {
@@ -123,20 +130,44 @@ public sealed class LocalHttpSyncTransportService : ISyncTransportService {
             return;
         }
 
-        while (!string.IsNullOrEmpty(await reader.ReadLineAsync(cancellationToken))) {
-        }
-
         var parts = requestLine.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length < 2 || !string.Equals(parts[0], "GET", StringComparison.OrdinalIgnoreCase)) {
+        if (parts.Length < 2) {
             await WriteResponseAsync(stream, 405, "Method Not Allowed", "text/plain", "Method not allowed", cancellationToken);
             return;
         }
 
-        if (!string.Equals(parts[1], "/sync/hello", StringComparison.OrdinalIgnoreCase)) {
-            await WriteResponseAsync(stream, 404, "Not Found", "text/plain", "Not found", cancellationToken);
+        var method = parts[0];
+        var path = parts[1];
+
+        if (string.Equals(method, "GET", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(path, "/sync/hello", StringComparison.OrdinalIgnoreCase)) {
+            await HandleHelloAsync(stream, cancellationToken);
             return;
         }
 
+        if (string.Equals(method, "POST", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(path, "/sync/pair/start", StringComparison.OrdinalIgnoreCase)) {
+            var body = await ReadBodyAsync(reader, cancellationToken);
+            await HandlePairStartAsync(stream, body, cancellationToken);
+            return;
+        }
+
+        if (string.Equals(method, "POST", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(path, "/sync/pair/confirm", StringComparison.OrdinalIgnoreCase)) {
+            var body = await ReadBodyAsync(reader, cancellationToken);
+            await HandlePairConfirmAsync(stream, body, cancellationToken);
+            return;
+        }
+
+        if (!string.Equals(method, "GET", StringComparison.OrdinalIgnoreCase) && !string.Equals(method, "POST", StringComparison.OrdinalIgnoreCase)) {
+            await WriteResponseAsync(stream, 405, "Method Not Allowed", "text/plain", "Method not allowed", cancellationToken);
+            return;
+        }
+
+        await WriteResponseAsync(stream, 404, "Not Found", "text/plain", "Not found", cancellationToken);
+    }
+
+    private async Task HandleHelloAsync(NetworkStream stream, CancellationToken cancellationToken) {
         var identity = currentIdentity;
         if (identity == null) {
             await WriteResponseAsync(stream, 503, "Service Unavailable", "text/plain", "Sync is not available", cancellationToken);
@@ -147,6 +178,181 @@ public sealed class LocalHttpSyncTransportService : ISyncTransportService {
         var json = JsonSerializer.Serialize(response, JsonOptions);
         await WriteResponseAsync(stream, 200, "OK", "application/json", json, cancellationToken);
     }
+
+    private async Task HandlePairStartAsync(NetworkStream stream, string body, CancellationToken cancellationToken) {
+        var identity = currentIdentity;
+        if (identity == null) {
+            await WriteResponseAsync(stream, 503, "Service Unavailable", "text/plain", "Sync is not available", cancellationToken);
+            return;
+        }
+
+        var request = DeserializeBody<SyncPairStartRequest>(body);
+        if (request == null || string.IsNullOrWhiteSpace(request.DeviceId) || string.IsNullOrWhiteSpace(request.DeviceName)) {
+            await WriteResponseAsync(stream, 400, "Bad Request", "text/plain", "Invalid pairing request", cancellationToken);
+            return;
+        }
+
+        if (string.Equals(request.DeviceId, identity.DeviceId, StringComparison.OrdinalIgnoreCase)) {
+            await WriteResponseAsync(stream, 400, "Bad Request", "text/plain", "Cannot pair with self", cancellationToken);
+            return;
+        }
+
+        var sessionId = Guid.NewGuid().ToString("N");
+        var code = GeneratePairingCode();
+        var expiresAt = DateTimeOffset.Now.AddMinutes(5);
+        var remoteTrustToken = GenerateTrustToken();
+
+        lock (gate) {
+            pendingPairings[sessionId] = new PendingPairing(
+                request.DeviceId,
+                request.DeviceName,
+                request.Address,
+                code,
+                expiresAt,
+                remoteTrustToken);
+        }
+
+        var currentStatus = GetStatus();
+        var responseAddress = currentStatus is { Address: not null, Port: not null }
+            ? $"{currentStatus.Address}:{currentStatus.Port}"
+            : string.Empty;
+        var response = new SyncPairStartResponse(identity.DeviceId, identity.DeviceName, responseAddress, sessionId, code, expiresAt);
+        await WriteJsonResponseAsync(stream, response, cancellationToken);
+    }
+
+    private async Task HandlePairConfirmAsync(NetworkStream stream, string body, CancellationToken cancellationToken) {
+        var identity = currentIdentity;
+        if (identity == null) {
+            await WriteResponseAsync(stream, 503, "Service Unavailable", "text/plain", "Sync is not available", cancellationToken);
+            return;
+        }
+
+        var request = DeserializeBody<SyncPairConfirmRequest>(body);
+        if (request == null || string.IsNullOrWhiteSpace(request.SessionId)) {
+            await WriteResponseAsync(stream, 400, "Bad Request", "text/plain", "Invalid confirmation request", cancellationToken);
+            return;
+        }
+
+        PendingPairing? pending;
+        lock (gate) {
+            pendingPairings.TryGetValue(request.SessionId, out pending);
+        }
+
+        if (pending == null || pending.ExpiresAt < DateTimeOffset.Now) {
+            await WriteResponseAsync(stream, 404, "Not Found", "text/plain", "Pairing session expired", cancellationToken);
+            return;
+        }
+
+        if (!string.Equals(NormalizePairingCode(request.VerificationCode), NormalizePairingCode(pending.VerificationCode), StringComparison.Ordinal) ||
+            !string.Equals(request.DeviceId, pending.DeviceId, StringComparison.OrdinalIgnoreCase)) {
+            await WriteResponseAsync(stream, 403, "Forbidden", "text/plain", "Pairing code mismatch", cancellationToken);
+            return;
+        }
+
+        AddOrReplacePairedDevice(new PairedSyncDevice(
+            pending.DeviceId,
+            pending.DeviceName,
+            string.IsNullOrWhiteSpace(request.Address) ? pending.Address : request.Address,
+            DateTimeOffset.Now,
+            null,
+            true,
+            request.TrustToken));
+
+        lock (gate) {
+            pendingPairings.Remove(request.SessionId);
+        }
+
+        var currentStatus = GetStatus();
+        var responseAddress = currentStatus is { Address: not null, Port: not null }
+            ? $"{currentStatus.Address}:{currentStatus.Port}"
+            : string.Empty;
+        var response = new SyncPairConfirmResponse(identity.DeviceId, identity.DeviceName, responseAddress, pending.RemoteTrustToken);
+        await WriteJsonResponseAsync(stream, response, cancellationToken);
+    }
+
+    private async Task<string> ReadBodyAsync(StreamReader reader, CancellationToken cancellationToken) {
+        var contentLength = 0;
+        string? line;
+        while (!string.IsNullOrEmpty(line = await reader.ReadLineAsync(cancellationToken))) {
+            const string prefix = "Content-Length:";
+            if (line.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) &&
+                int.TryParse(line[prefix.Length..].Trim(), out var parsedLength)) {
+                contentLength = parsedLength;
+            }
+        }
+
+        if (contentLength <= 0) {
+            return string.Empty;
+        }
+
+        var buffer = new char[contentLength];
+        var read = 0;
+        while (read < contentLength) {
+            var count = await reader.ReadAsync(buffer.AsMemory(read, contentLength - read), cancellationToken);
+            if (count == 0) {
+                break;
+            }
+
+            read += count;
+        }
+
+        return new string(buffer, 0, read);
+    }
+
+    private static T? DeserializeBody<T>(string body) {
+        if (string.IsNullOrWhiteSpace(body)) {
+            return default;
+        }
+
+        try {
+            return JsonSerializer.Deserialize<T>(body, JsonOptions);
+        }
+        catch (JsonException) {
+            return default;
+        }
+    }
+
+    private static Task WriteJsonResponseAsync<T>(NetworkStream stream, T response, CancellationToken cancellationToken) {
+        var json = JsonSerializer.Serialize(response, JsonOptions);
+        return WriteResponseAsync(stream, 200, "OK", "application/json", json, cancellationToken);
+    }
+
+    private void AddOrReplacePairedDevice(PairedSyncDevice device) {
+        const string key = "Sync_PairedDevices";
+        var json = settings.Get(key, "");
+        var devices = string.IsNullOrWhiteSpace(json)
+            ? []
+            : JsonSerializer.Deserialize<List<PairedSyncDevice>>(json) ?? [];
+
+        devices = devices
+            .Where(existing => !string.Equals(existing.DeviceId, device.DeviceId, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        devices.Add(device);
+        settings.Set(key, JsonSerializer.Serialize(devices));
+    }
+
+    private static string GeneratePairingCode() {
+        var code = RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
+        return $"{code[..3]}-{code[3..]}";
+    }
+
+    private static string GenerateTrustToken() {
+        Span<byte> bytes = stackalloc byte[32];
+        RandomNumberGenerator.Fill(bytes);
+        return Convert.ToBase64String(bytes);
+    }
+
+    private static string NormalizePairingCode(string code) {
+        return new string(code.Where(char.IsDigit).ToArray());
+    }
+
+    private sealed record PendingPairing(
+        string DeviceId,
+        string DeviceName,
+        string Address,
+        string VerificationCode,
+        DateTimeOffset ExpiresAt,
+        string RemoteTrustToken);
 
     private static async Task WriteResponseAsync(
         NetworkStream stream,
