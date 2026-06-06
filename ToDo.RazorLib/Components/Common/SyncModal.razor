@@ -1,0 +1,299 @@
+@using ToDo.RazorLib.Services
+@inject ISyncService SyncService
+@inject ISyncTransportService SyncTransportService
+
+<MudDialog>
+	<DialogContent>
+		<div @onkeydown="HandleKeyDown">
+			<MudStack Spacing="4">
+				<MudSwitch T="bool"
+							  @bind-Value="_syncEnabled"
+							  @bind-Value:after="OnSyncEnabledChangedAsync"
+							  Color="Color.Primary"
+							  Label="Sync" />
+
+				<MudTextField @bind-Value="_deviceName"
+								  Label="Device Name"
+								  Required="true" />
+
+				<MudSwitch T="bool"
+							  @bind-Value="_autoSync"
+							  Color="Color.Primary"
+							  Disabled="!_syncEnabled"
+							  Label="Auto sync on changes" />
+
+				<MudTextField @bind-Value="_manualAddress"
+								  Label="Manual device address"
+								  Placeholder="192.168.1.25:51234" />
+
+				<MudDivider />
+
+				<MudText Typo="Typo.subtitle1">This device</MudText>
+				<MudPaper Class="pa-3" Elevation="0" Outlined="true">
+					<MudStack Spacing="1">
+						<MudText Typo="Typo.body2">@_deviceName</MudText>
+						<MudText Typo="Typo.caption" Color="Color.Secondary">@_deviceId</MudText>
+						@if (_transportStatus.IsRunning) {
+							<MudText Typo="Typo.caption" Color="Color.Success">
+								Listening at @_transportStatus.Address:@_transportStatus.Port
+							</MudText>
+						}
+						else if (!string.IsNullOrWhiteSpace(_transportStatus.Error)) {
+							<MudText Typo="Typo.caption" Color="Color.Error">@_transportStatus.Error</MudText>
+						}
+						else {
+							<MudText Typo="Typo.caption" Color="Color.Secondary">Local sync listener stopped</MudText>
+						}
+					</MudStack>
+				</MudPaper>
+
+				<div class="d-flex align-center">
+					<MudText Typo="Typo.subtitle1">Available devices</MudText>
+					<MudSpacer />
+					<MudIconButton Icon="@Icons.Material.Filled.Refresh"
+										aria-label="Refresh available devices"
+										Size="Size.Small"
+										Color="Color.Primary"
+										Disabled="_isDiscovering"
+										OnClick="RefreshAvailableDevicesAsync" />
+				</div>
+				<MudPaper Class="pa-3" Elevation="0" Outlined="true">
+					@if (_isDiscovering) {
+						<MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+					}
+					else if (_availableDevices.Count == 0) {
+						<MudText Typo="Typo.body2" Color="Color.Secondary">@GetDiscoveryMessage()</MudText>
+					}
+					else {
+						<MudList T="AvailableSyncDevice" Dense="true">
+							@foreach (var device in _availableDevices) {
+								<MudListItem Value="@device">
+									<div class="d-flex align-center mud-width-full">
+										<MudStack Spacing="0">
+											<MudText Typo="Typo.body2">@device.DeviceName</MudText>
+											<MudText Typo="Typo.caption" Color="Color.Secondary">@device.Address</MudText>
+										</MudStack>
+										<MudSpacer />
+										<MudButton Size="Size.Small"
+													 Color="Color.Primary"
+													 Variant="Variant.Text"
+													 OnClick="@(() => StartPairing(device))">
+											Pair
+										</MudButton>
+									</div>
+								</MudListItem>
+							}
+						</MudList>
+					}
+				</MudPaper>
+
+				@if (_pairingSession != null) {
+					<MudPaper Class="pa-3" Elevation="0" Outlined="true">
+						<MudStack Spacing="2">
+							<MudText Typo="Typo.subtitle2">Pair with @_pairingSession.DeviceName</MudText>
+							<MudText Typo="Typo.body2">Confirm this code on both devices.</MudText>
+							<MudText Typo="Typo.h5" Align="Align.Center">@_pairingSession.VerificationCode</MudText>
+							<MudTextField @bind-Value="_pairingCodeConfirmation"
+											  Label="Code from other device"
+											  Placeholder="000-000" />
+							<div class="d-flex justify-end gap-2">
+								<MudButton Size="Size.Small" OnClick="CancelPairing">Cancel</MudButton>
+								<MudButton Size="Size.Small"
+											 Color="Color.Primary"
+											 Disabled="@(!CanConfirmPairing())"
+											 OnClick="ConfirmPairing">
+									Confirm
+								</MudButton>
+							</div>
+						</MudStack>
+					</MudPaper>
+				}
+
+				<MudText Typo="Typo.subtitle1">Paired devices</MudText>
+				<MudPaper Class="pa-3" Elevation="0" Outlined="true">
+					@if (_pairedDevices.Count == 0) {
+						<MudText Typo="Typo.body2" Color="Color.Secondary">No paired devices yet.</MudText>
+					}
+					else {
+						<MudList T="PairedSyncDevice" Dense="true">
+							@foreach (var device in _pairedDevices) {
+								<MudListItem Value="@device">
+									<div class="d-flex align-center mud-width-full">
+										<MudStack Spacing="0">
+											<MudText Typo="Typo.body2">@device.DeviceName</MudText>
+											<MudText Typo="Typo.caption" Color="@(device.IsOnline ? Color.Success : Color.Secondary)">
+												@(device.IsOnline ? "Online" : "Offline") - @device.Address
+											</MudText>
+										</MudStack>
+										<MudSpacer />
+										<MudIconButton Icon="@Icons.Material.Filled.Delete"
+															aria-label="Remove paired device"
+															Size="Size.Small"
+															Color="Color.Error"
+															OnClick="@(() => RemovePairedDevice(device.DeviceId))" />
+									</div>
+								</MudListItem>
+							}
+						</MudList>
+					}
+				</MudPaper>
+			</MudStack>
+		</div>
+	</DialogContent>
+	<DialogActions>
+		<MudButton OnClick="Cancel">Cancel</MudButton>
+		<MudButton Color="Color.Primary" OnClick="Submit">Save</MudButton>
+	</DialogActions>
+</MudDialog>
+
+@code {
+	[CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+	private bool _syncEnabled;
+	private bool _autoSync;
+	private string _deviceName = string.Empty;
+	private string _deviceId = string.Empty;
+	private string _manualAddress = string.Empty;
+	private IReadOnlyList<AvailableSyncDevice> _availableDevices = Array.Empty<AvailableSyncDevice>();
+	private IReadOnlyList<PairedSyncDevice> _pairedDevices = Array.Empty<PairedSyncDevice>();
+	private SyncPairingSession? _pairingSession;
+	private SyncTransportStatus _transportStatus = new(false, null, null, null, null);
+	private string _pairingCodeConfirmation = string.Empty;
+	private string? _discoveryMessage;
+	private bool _isDiscovering;
+
+	protected override async Task OnInitializedAsync() {
+		var identity = SyncService.GetLocalDevice();
+		_syncEnabled = identity.SyncEnabled;
+		_autoSync = identity.AutoSyncOnChanges;
+		_deviceId = identity.DeviceId;
+		_deviceName = identity.DeviceName;
+		_manualAddress = identity.ManualAddress;
+		_pairedDevices = SyncService.GetPairedDevices();
+		await ApplyTransportStateAsync();
+
+		await RefreshAvailableDevicesAsync();
+	}
+
+	private void Cancel() => MudDialog.Cancel();
+
+	private async Task HandleKeyDown(KeyboardEventArgs args) {
+		if (args.Key == "Escape") {
+			Cancel();
+			return;
+		}
+
+		if (args.Key == "Enter") {
+			if (_pairingSession != null) {
+				await ConfirmPairing();
+				return;
+			}
+
+			await Submit();
+		}
+	}
+
+	private async Task Submit() {
+		if (string.IsNullOrWhiteSpace(_deviceName)) {
+			return;
+		}
+
+		SaveCurrentIdentity();
+		await ApplyTransportStateAsync();
+
+		MudDialog.Close(DialogResult.Ok(true));
+	}
+
+	private async Task OnSyncEnabledChangedAsync() {
+		SaveCurrentIdentity();
+		await ApplyTransportStateAsync();
+		StateHasChanged();
+	}
+
+	private async Task RefreshAvailableDevicesAsync() {
+		SaveCurrentIdentity();
+		_isDiscovering = true;
+
+		try {
+			var discovery = await SyncService.DiscoverAvailableDevicesAsync();
+			_availableDevices = discovery.Devices;
+			_discoveryMessage = discovery.Message;
+		}
+		finally {
+			_isDiscovering = false;
+		}
+	}
+
+	private void SaveCurrentIdentity() {
+		SyncService.SaveLocalDevice(new SyncDeviceIdentity(
+			_deviceId,
+			string.IsNullOrWhiteSpace(_deviceName) ? "ToDo Device" : _deviceName,
+			_syncEnabled,
+			_autoSync,
+			_manualAddress));
+	}
+
+	private async Task ApplyTransportStateAsync() {
+		var identity = SyncService.GetLocalDevice();
+		if (identity.SyncEnabled) {
+			await SyncTransportService.StartAsync(identity);
+		}
+		else {
+			await SyncTransportService.StopAsync();
+		}
+
+		_transportStatus = SyncTransportService.GetStatus();
+	}
+
+	private void StartPairing(AvailableSyncDevice device) {
+		_pairingSession = SyncService.StartPairing(device);
+		_pairingCodeConfirmation = string.Empty;
+	}
+
+	private void CancelPairing() {
+		_pairingSession = null;
+		_pairingCodeConfirmation = string.Empty;
+	}
+
+	private async Task ConfirmPairing() {
+		if (_pairingSession == null || !CanConfirmPairing()) {
+			return;
+		}
+
+		SyncService.ConfirmPairing(_pairingSession);
+		_pairingSession = null;
+		_pairingCodeConfirmation = string.Empty;
+		_pairedDevices = SyncService.GetPairedDevices();
+		await RefreshAvailableDevicesAsync();
+		StateHasChanged();
+	}
+
+	private async Task RemovePairedDevice(string deviceId) {
+		SyncService.RemovePairedDevice(deviceId);
+		_pairedDevices = SyncService.GetPairedDevices();
+		await RefreshAvailableDevicesAsync();
+	}
+
+	private bool CanConfirmPairing() {
+		return _pairingSession != null
+			&& _pairingSession.ExpiresAt >= DateTimeOffset.Now
+			&& string.Equals(
+				NormalizePairingCode(_pairingCodeConfirmation),
+				NormalizePairingCode(_pairingSession.VerificationCode),
+				StringComparison.Ordinal);
+	}
+
+	private static string NormalizePairingCode(string code) {
+		return new string(code.Where(char.IsDigit).ToArray());
+	}
+
+	private string GetDiscoveryMessage() {
+		if (!string.IsNullOrWhiteSpace(_discoveryMessage)) {
+			return _discoveryMessage;
+		}
+
+		return string.IsNullOrWhiteSpace(_manualAddress)
+			? "Enter a manual address and refresh."
+			: "No devices found yet.";
+	}
+}

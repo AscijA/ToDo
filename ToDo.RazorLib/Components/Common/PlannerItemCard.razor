@@ -100,27 +100,93 @@
 	}
 
 	private static string? GetAccentTint(string? color) {
+		if (!TryGetRgb(color, out var r, out var g, out var b)) {
+			return null;
+		}
+
+		return $"rgba({r}, {g}, {b}, .12)";
+	}
+
+	private static bool TryGetRgb(string? color, out int r, out int g, out int b) {
+		r = g = b = 0;
+
 		if (string.IsNullOrWhiteSpace(color)) {
-			return null;
+			return false;
 		}
 
-		var hex = color.Trim();
-		if (!hex.StartsWith('#')) {
-			return null;
+		var value = color.Trim();
+		if (value.StartsWith('#')) {
+			return TryGetHexRgb(value, out r, out g, out b);
 		}
 
-		hex = hex[1..];
+		return TryGetCssRgb(value, out r, out g, out b);
+	}
+
+	private static bool TryGetHexRgb(string color, out int r, out int g, out int b) {
+		r = g = b = 0;
+
+		var hex = color[1..];
 		if (hex.Length == 3) {
 			hex = string.Concat(hex.Select(c => $"{c}{c}"));
 		}
-
-		if (hex.Length != 6 || !int.TryParse(hex, System.Globalization.NumberStyles.HexNumber, null, out var value)) {
-			return null;
+		else if (hex.Length == 4) {
+			hex = string.Concat(hex.Take(3).Select(c => $"{c}{c}"));
+		}
+		else if (hex.Length == 8) {
+			hex = hex[..6];
 		}
 
-		var r = (value >> 16) & 0xff;
-		var g = (value >> 8) & 0xff;
-		var b = value & 0xff;
-		return $"rgba({r}, {g}, {b}, .12)";
+		if (hex.Length != 6 || !int.TryParse(hex, System.Globalization.NumberStyles.HexNumber, null, out var value)) {
+			return false;
+		}
+
+		r = (value >> 16) & 0xff;
+		g = (value >> 8) & 0xff;
+		b = value & 0xff;
+		return true;
+	}
+
+	private static bool TryGetCssRgb(string color, out int r, out int g, out int b) {
+		r = g = b = 0;
+
+		if (!color.StartsWith("rgb", StringComparison.OrdinalIgnoreCase)) {
+			return false;
+		}
+
+		var start = color.IndexOf('(');
+		var end = color.IndexOf(')', start + 1);
+		if (start < 0 || end <= start) {
+			return false;
+		}
+
+		var channels = color[(start + 1)..end]
+			.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+		if (channels.Length < 3) {
+			return false;
+		}
+
+		return TryGetCssChannel(channels[0], out r)
+			&& TryGetCssChannel(channels[1], out g)
+			&& TryGetCssChannel(channels[2], out b);
+	}
+
+	private static bool TryGetCssChannel(string channel, out int value) {
+		value = 0;
+
+		if (channel.EndsWith('%')) {
+			if (!double.TryParse(channel[..^1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var percent)) {
+				return false;
+			}
+
+			value = (int)Math.Round(Math.Clamp(percent, 0, 100) * 255 / 100);
+			return true;
+		}
+
+		if (!double.TryParse(channel, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var numeric)) {
+			return false;
+		}
+
+		value = (int)Math.Round(Math.Clamp(numeric, 0, 255));
+		return true;
 	}
 }

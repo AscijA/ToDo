@@ -8,6 +8,8 @@
 @inject ITaskListService ListService
 @inject IDialogService DialogService
 @inject ISettingsService SettingsService
+@inject SyncModalRequestService SyncModalRequests
+@implements IDisposable
 
 <MudThemeProvider @ref="_mudThemeProvider"
 						Theme="_currentTheme"
@@ -43,7 +45,7 @@
 			<MudIconButton Icon="@Icons.Material.Filled.Sync"
 								aria-label="Sync"
 								Color="Color.Primary"
-								OnClick="()=>{}" />
+								OnClick="OpenSync" />
 			<MudIconButton Icon="@Icons.Material.Filled.Settings"
 								aria-label="Settings"
 								Color="Color.Primary"
@@ -77,6 +79,7 @@
 	private Guid _plannerKey = Guid.NewGuid();
 
 	protected override async Task OnInitializedAsync() {
+		SyncModalRequests.OpenRequested += OnSyncModalRequested;
 		LoadSettings();
 		await LoadTaskLists();
 	}
@@ -137,6 +140,14 @@
 		}
 	}
 
+	private async Task OpenSync() {
+		await DialogService.ShowAsync<SyncModal>("Sync", new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+	}
+
+	private void OnSyncModalRequested() {
+		_ = InvokeAsync(OpenSync);
+	}
+
 	private async Task LoadTaskLists() {
 		for (int i = 0; i < 3; i++) {
 			try {
@@ -178,4 +189,8 @@
 	}
 
 	private string GetIconLetter(string name) => string.IsNullOrWhiteSpace(name) ? "?" : name.Trim()[0].ToString().ToUpperInvariant();
+
+	public void Dispose() {
+		SyncModalRequests.OpenRequested -= OnSyncModalRequested;
+	}
 }

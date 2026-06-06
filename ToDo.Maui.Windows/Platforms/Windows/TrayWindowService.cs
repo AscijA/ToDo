@@ -1,6 +1,8 @@
 using H.NotifyIcon;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Windowing;
 using System.Drawing;
+using ToDo.RazorLib.Services;
 using WinUiControls = Microsoft.UI.Xaml.Controls;
 
 namespace ToDo.Maui.Windows.Platforms.Windows;
@@ -64,6 +66,10 @@ internal static class TrayWindowService {
     }
 
     private static void Sync() {
+        RestoreWindow();
+
+        var services = Microsoft.Maui.Controls.Application.Current?.Handler?.MauiContext?.Services;
+        services?.GetService<SyncModalRequestService>()?.RequestOpen();
     }
 
     public static void ExitApplication() {

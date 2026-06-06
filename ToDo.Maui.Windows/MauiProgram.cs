@@ -70,6 +70,10 @@ public static class MauiProgram {
         builder.Services.AddTransient<IMonthlyOccurrenceService, MonthlyOccurrenceService>();
         builder.Services.AddTransient<ITaskListService, TaskListService>();
         builder.Services.AddSingleton<ISettingsService, MauiSettingsService>();
+        builder.Services.AddSingleton<ISyncDiscoveryService, ManualAddressSyncDiscoveryService>();
+        builder.Services.AddSingleton<ISyncTransportService, LocalHttpSyncTransportService>();
+        builder.Services.AddSingleton<ISyncService, LocalSyncService>();
+        builder.Services.AddSingleton<SyncModalRequestService>();
         return builder.Build();
     }
 
