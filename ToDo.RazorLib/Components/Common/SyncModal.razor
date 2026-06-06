@@ -123,13 +123,21 @@
 							<MudTextField @bind-Value="_pairingCodeConfirmation"
 											  Label="Code from other device"
 											  Placeholder="000-000" />
+							@if (!string.IsNullOrWhiteSpace(_pairingMessage)) {
+								<MudAlert Severity="Severity.Warning" Dense="true">@_pairingMessage</MudAlert>
+							}
 							<div class="d-flex justify-end gap-2">
-								<MudButton Size="Size.Small" OnClick="CancelPairing">Cancel</MudButton>
+								<MudButton Size="Size.Small" Disabled="_isPairingBusy" OnClick="CancelPairing">Cancel</MudButton>
 								<MudButton Size="Size.Small"
 											 Color="Color.Primary"
-											 Disabled="@(!CanConfirmPairing())"
+											 Disabled="@(_isPairingBusy || !CanConfirmPairing())"
 											 OnClick="ConfirmPairing">
-									Confirm
+									@if (_isPairingBusy) {
+										<MudProgressCircular Size="Size.Small" Indeterminate="true" />
+									}
+									else {
+										<span>Confirm</span>
+									}
 								</MudButton>
 							</div>
 						</MudStack>
@@ -195,6 +203,7 @@
 	private PeriodicTimer? _incomingPairingTimer;
 	private CancellationTokenSource? _incomingPairingTimerCancellation;
 	private bool _isDiscovering;
+	private bool _isPairingBusy;
 
 	protected override async Task OnInitializedAsync() {
 		var identity = SyncService.GetLocalDevice();
@@ -284,9 +293,11 @@
 
 	private async Task StartPairingAsync(AvailableSyncDevice device) {
 		_pairingMessage = null;
+		_isPairingBusy = true;
 		var localAddress = GetLocalSyncAddress();
 		if (string.IsNullOrWhiteSpace(localAddress)) {
 			_pairingMessage = "Turn Sync on before pairing.";
+			_isPairingBusy = false;
 			return;
 		}
 
@@ -295,15 +306,19 @@
 		}
 		catch (Exception ex) {
 			_pairingMessage = ex.Message;
+			_isPairingBusy = false;
 			return;
 		}
 
 		if (_pairingSession == null) {
 			_pairingMessage = $"Could not start pairing with {device.DeviceName}.";
+			_isPairingBusy = false;
 			return;
 		}
 
+		_pairingMessage = "Approve this request on the other device, then enter the matching code here.";
 		_pairingCodeConfirmation = string.Empty;
+		_isPairingBusy = false;
 	}
 
 	private void CancelPairing() {
@@ -316,20 +331,25 @@
 			return;
 		}
 
+		_pairingMessage = null;
+		_isPairingBusy = true;
 		bool paired;
 		try {
 			paired = await SyncService.ConfirmPairingAsync(_pairingSession, GetLocalSyncAddress());
 		}
 		catch (Exception ex) {
 			_pairingMessage = ex.Message;
+			_isPairingBusy = false;
 			return;
 		}
 
 		if (!paired) {
 			_pairingMessage = "Pairing failed. Check that the code still matches and try again.";
+			_isPairingBusy = false;
 			return;
 		}
 
+		_isPairingBusy = false;
 		_pairingSession = null;
 		_pairingCodeConfirmation = string.Empty;
 		_pairingMessage = null;
