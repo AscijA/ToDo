@@ -2,9 +2,11 @@
 
 <MudDialog>
     <DialogContent>
-        <MudTextField @bind-Value="Name" Label="Name" Required="true" />
-        <MudColorPicker @bind-Text="ListColor" Label="Color" Style="@($"color: {ListColor};")" />
-        <MudTextField @bind-Value="Description" Label="Description" Lines="3" />
+        <div @onkeydown="HandleKeyDown">
+            <MudTextField @bind-Value="Name" Label="Name" Required="true" />
+            <MudColorPicker @bind-Text="ListColor" Label="Color" Style="@($"color: {ListColor};")" />
+            <MudTextField @bind-Value="Description" Label="Description" Lines="3" />
+        </div>
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="Cancel">Cancel</MudButton>
@@ -20,6 +22,17 @@
     [Parameter] public string? Description { get; set; }
 
     private void Cancel() => MudDialog.Cancel();
+
+    private void HandleKeyDown(KeyboardEventArgs args) {
+        if (args.Key == "Escape") {
+            Cancel();
+            return;
+        }
+
+        if (args.Key == "Enter") {
+            Submit();
+        }
+    }
 
     private void Submit() {
         if (string.IsNullOrWhiteSpace(Name)) return;

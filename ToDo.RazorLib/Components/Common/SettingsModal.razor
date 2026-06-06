@@ -4,66 +4,68 @@
 
 <MudDialog>
 	<DialogContent>
-		<MudStack Spacing="4">
-			<MudSelect T="string" @bind-Value="_appearance" Label="Appearance">
-				<MudSelectItem Value="@("Light")">Light</MudSelectItem>
-				<MudSelectItem Value="@("Dark")">Dark</MudSelectItem>
-				<MudSelectItem Value="@("System")">Follow System</MudSelectItem>
-			</MudSelect>
+		<div @onkeydown="HandleKeyDown">
+			<MudStack Spacing="4">
+				<MudSelect T="string" @bind-Value="_appearance" Label="Appearance">
+					<MudSelectItem Value="@("Light")">Light</MudSelectItem>
+					<MudSelectItem Value="@("Dark")">Dark</MudSelectItem>
+					<MudSelectItem Value="@("System")">Follow System</MudSelectItem>
+				</MudSelect>
 
-			<MudSelect T="string" @bind-Value="_themeName" Label="Theme">
-				<MudSelectItem Value="@("ODP")">One Dark Pro</MudSelectItem>
-				<MudSelectItem Value="@("Solarized")">Solarized</MudSelectItem>
-				<MudSelectItem Value="@("Blue")">Blue Night</MudSelectItem>
-				<MudSelectItem Value="@("Green")">Green</MudSelectItem>
-				<MudSelectItem Value="@("Custom")">Custom</MudSelectItem>
-			</MudSelect>
+				<MudSelect T="string" @bind-Value="_themeName" Label="Theme">
+					<MudSelectItem Value="@("ODP")">One Dark Pro</MudSelectItem>
+					<MudSelectItem Value="@("Solarized")">Solarized</MudSelectItem>
+					<MudSelectItem Value="@("Blue")">Blue Night</MudSelectItem>
+					<MudSelectItem Value="@("Green")">Green</MudSelectItem>
+					<MudSelectItem Value="@("Custom")">Custom</MudSelectItem>
+				</MudSelect>
 
-			@if (_themeName == "Custom") {
-				<MudGrid>
-					<MudItem xs="6">
-						<MudColorPicker @bind-Text="_customPrimary" Label="Primary" Style="@($"color: {_customPrimary};")" />
-					</MudItem>
-					<MudItem xs="6">
-						<MudColorPicker @bind-Text="_customSecondary" Label="Secondary" Style="@($"color: {_customSecondary};")" />
-					</MudItem>
-					<MudItem xs="6">
-						<MudColorPicker @bind-Text="_customBackground" Label="Background" Style="@($"color: {_customBackground};")" />
-					</MudItem>
-					<MudItem xs="6">
-						<MudColorPicker @bind-Text="_customSurface" Label="Surface" Style="@($"color: {_customSurface};")" />
-					</MudItem>
-				</MudGrid>
-			}
+				@if (_themeName == "Custom") {
+					<MudGrid>
+						<MudItem xs="6">
+							<MudColorPicker @bind-Text="_customPrimary" Label="Primary" Style="@($"color: {_customPrimary};")" />
+						</MudItem>
+						<MudItem xs="6">
+							<MudColorPicker @bind-Text="_customSecondary" Label="Secondary" Style="@($"color: {_customSecondary};")" />
+						</MudItem>
+						<MudItem xs="6">
+							<MudColorPicker @bind-Text="_customBackground" Label="Background" Style="@($"color: {_customBackground};")" />
+						</MudItem>
+						<MudItem xs="6">
+							<MudColorPicker @bind-Text="_customSurface" Label="Surface" Style="@($"color: {_customSurface};")" />
+						</MudItem>
+					</MudGrid>
+				}
 
-			<MudDivider />
+				<MudDivider />
 
-			<MudText Typo="Typo.h6">Layout</MudText>
+				<MudText Typo="Typo.h6">Layout</MudText>
 
-			<MudSwitch T="bool" @bind-Value="_bigOnLeft" Label="Big Container on Left" Color="Color.Primary" />
-			@if (!(OperatingSystem.IsAndroid() || OperatingSystem.IsIOS())) {
-				<MudSwitch T="bool" @bind-Value="_minimizeToTray" Label="Minimize to Tray on Close" Color="Color.Primary" />
-			}
+				<MudSwitch T="bool" @bind-Value="_bigOnLeft" Label="Big Container on Left" Color="Color.Primary" />
+				@if (!(OperatingSystem.IsAndroid() || OperatingSystem.IsIOS())) {
+					<MudSwitch T="bool" @bind-Value="_minimizeToTray" Label="Minimize to Tray on Close" Color="Color.Primary" />
+				}
 
-			<MudSelect T="string" @bind-Value="_slotBig" Label="Big Slot">
-				<MudSelectItem Value="@("Daily")">Daily Planner</MudSelectItem>
-				<MudSelectItem Value="@("Weekly")">Weekly Planner</MudSelectItem>
-				<MudSelectItem Value="@("Monthly")">Monthly Planner</MudSelectItem>
-			</MudSelect>
+				<MudSelect T="string" @bind-Value="_slotBig" Label="Big Slot">
+					<MudSelectItem Value="@("Daily")">Daily Planner</MudSelectItem>
+					<MudSelectItem Value="@("Weekly")">Weekly Planner</MudSelectItem>
+					<MudSelectItem Value="@("Monthly")">Monthly Planner</MudSelectItem>
+				</MudSelect>
 
-			<MudSelect T="string" @bind-Value="_slotSmallTop" Label="Small Top Slot">
-				<MudSelectItem Value="@("Daily")">Daily Planner</MudSelectItem>
-				<MudSelectItem Value="@("Weekly")">Weekly Planner</MudSelectItem>
-				<MudSelectItem Value="@("Monthly")">Monthly Planner</MudSelectItem>
-			</MudSelect>
+				<MudSelect T="string" @bind-Value="_slotSmallTop" Label="Small Top Slot">
+					<MudSelectItem Value="@("Daily")">Daily Planner</MudSelectItem>
+					<MudSelectItem Value="@("Weekly")">Weekly Planner</MudSelectItem>
+					<MudSelectItem Value="@("Monthly")">Monthly Planner</MudSelectItem>
+				</MudSelect>
 
-			<MudSelect T="string" @bind-Value="_slotSmallBottom" Label="Small Bottom Slot">
-				<MudSelectItem Value="@("Daily")">Daily Planner</MudSelectItem>
-				<MudSelectItem Value="@("Weekly")">Weekly Planner</MudSelectItem>
-				<MudSelectItem Value="@("Monthly")">Monthly Planner</MudSelectItem>
-			</MudSelect>
+				<MudSelect T="string" @bind-Value="_slotSmallBottom" Label="Small Bottom Slot">
+					<MudSelectItem Value="@("Daily")">Daily Planner</MudSelectItem>
+					<MudSelectItem Value="@("Weekly")">Weekly Planner</MudSelectItem>
+					<MudSelectItem Value="@("Monthly")">Monthly Planner</MudSelectItem>
+				</MudSelect>
 
-		</MudStack>
+			</MudStack>
+		</div>
 	</DialogContent>
 	<DialogActions>
 		<MudButton OnClick="Cancel">Cancel</MudButton>
@@ -103,6 +105,17 @@
 	}
 
 	private void Cancel() => MudDialog.Cancel();
+
+	private void HandleKeyDown(KeyboardEventArgs args) {
+		if (args.Key == "Escape") {
+			Cancel();
+			return;
+		}
+
+		if (args.Key == "Enter") {
+			Submit();
+		}
+	}
 
 	private void Submit() {
 		SettingsService.Set("Appearance", _appearance);

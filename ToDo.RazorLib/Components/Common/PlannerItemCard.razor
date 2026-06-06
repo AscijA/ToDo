@@ -1,6 +1,6 @@
 @using ToDo.Application.Contracts.DTOs
 
-<MudForm Model="@Item" ReadOnly="ReadOnly" Style="@(string.IsNullOrEmpty(Item.Color) ? "" : $"border-left: 6px solid {Item.Color}; padding-left: 12px; margin-left: -12px;")">
+<MudForm Model="@Item" ReadOnly="ReadOnly" Style="@GetItemStyle()">
 	<div class="d-flex align-center gap-4">
 		<MudCheckBox @bind-Value="Item.IsDone"
 						 @bind-Value:after="InvokeTitleChangedAsync"
@@ -8,7 +8,11 @@
 						 Dense="true"
 						 Size="Size.Small" />
 
-		@Schedule
+		@if (Schedule != null) {
+			<div class="planner-schedule-slot @ScheduleClass" style="@GetScheduleStyle()">
+				@Schedule
+			</div>
+		}
 
 		<MudTextField @bind-Value="Item.Title"
 					  @bind-Value:after="InvokeTitleChangedAsync"
@@ -45,6 +49,9 @@
 	public RenderFragment? Schedule { get; set; }
 
 	[Parameter]
+	public string? ScheduleClass { get; set; }
+
+	[Parameter]
 	public bool ReadOnly { get; set; }
 
 	[Parameter]
@@ -75,5 +82,45 @@
 
 	private async Task InvokeTitleChangedAsync() {
 		await OnTitleChanged.InvokeAsync();
+	}
+
+	private string GetItemStyle() {
+		var tint = GetAccentTint(Item.Color);
+		if (tint == null) {
+			return string.Empty;
+		}
+
+		return $"background-color: {tint}; border-radius: 4px; padding: 0 6px; margin: 0 -6px;";
+	}
+
+	private string? GetScheduleStyle() {
+		return ScheduleClass == "weekly-schedule-slot"
+			? "flex: 0 0 75px; width: 75px; max-width: 75px; overflow: hidden;"
+			: null;
+	}
+
+	private static string? GetAccentTint(string? color) {
+		if (string.IsNullOrWhiteSpace(color)) {
+			return null;
+		}
+
+		var hex = color.Trim();
+		if (!hex.StartsWith('#')) {
+			return null;
+		}
+
+		hex = hex[1..];
+		if (hex.Length == 3) {
+			hex = string.Concat(hex.Select(c => $"{c}{c}"));
+		}
+
+		if (hex.Length != 6 || !int.TryParse(hex, System.Globalization.NumberStyles.HexNumber, null, out var value)) {
+			return null;
+		}
+
+		var r = (value >> 16) & 0xff;
+		var g = (value >> 8) & 0xff;
+		var b = value & 0xff;
+		return $"rgba({r}, {g}, {b}, .12)";
 	}
 }

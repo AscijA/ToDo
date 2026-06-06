@@ -1,0 +1,19 @@
+::deep .planner-schedule-slot {
+   flex: 0 0 auto;
+   min-width: 0;
+}
+
+::deep .planner-schedule-slot.weekly-schedule-slot {
+   flex-basis: 100px;
+   width: 100px;
+   max-width: 100px;
+   overflow: hidden;
+}
+
+::deep .planner-schedule-slot.weekly-schedule-slot .mud-input-control,
+::deep .planner-schedule-slot.weekly-schedule-slot .mud-input,
+::deep .planner-schedule-slot.weekly-schedule-slot .mud-select {
+   width: 100px !important;
+   min-width: 100px !important;
+   max-width: 100px !important;
+}

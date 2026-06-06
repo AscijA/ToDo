@@ -1,4 +1,3 @@
-#pragma warning disable CS8602
 using Microsoft.EntityFrameworkCore;
 using ToDo.Application.Contracts.DTOs;
 using ToDo.Application.Interfaces.Services;
@@ -30,18 +29,15 @@ public class DailyPlanService : IDailyPlanService {
         var taskDefIds = items.Select(i => i.TaskDefinitionId).Distinct().ToList();
         var colorMap = await context.TaskListItems.AsNoTracking()
             .Where(i => taskDefIds.Contains(i.TaskDefinitionId))
-            .Select(i => new { i.TaskDefinitionId, i.TaskList.Color })
+            .Select(i => new { i.TaskDefinitionId, Color = i.TaskList == null ? null : i.TaskList.Color })
             .ToListAsync();
         
         var colors = colorMap.GroupBy(x => x.TaskDefinitionId)
-                             .ToDictionary(g => g.Key, g => g.First()!.Color);
+                             .ToDictionary(g => g.Key, g => g.First().Color);
 
         var results = new List<DailyItemDTO>();
         foreach (var i in items) {
-            if (i != null)
-#pragma warning disable CS8602
-                results.Add(i.ToDailyItem(colors.GetValueOrDefault(i.TaskDefinitionId)));
-#pragma warning restore CS8602
+            results.Add(i.ToDailyItem(colors.GetValueOrDefault(i.TaskDefinitionId)));
         }
         return results;
     }
@@ -83,7 +79,7 @@ public class DailyPlanService : IDailyPlanService {
             .Select(i => i.TaskList!.Color)
             .FirstOrDefaultAsync();
 
-        return dailyOccurrence!.ToDailyItem(color);
+        return dailyOccurrence.ToDailyItem(color);
     }
 
     public async Task<List<WeeklyItemDTO>> GetAllWeeklyAsync(DateOnly date) {
@@ -138,18 +134,15 @@ public class DailyPlanService : IDailyPlanService {
         var taskDefIds = items.Select(i => i.TaskDefinitionId).Distinct().ToList();
         var colorMap = await context.TaskListItems.AsNoTracking()
             .Where(i => taskDefIds.Contains(i.TaskDefinitionId))
-            .Select(i => new { i.TaskDefinitionId, i.TaskList.Color })
+            .Select(i => new { i.TaskDefinitionId, Color = i.TaskList == null ? null : i.TaskList.Color })
             .ToListAsync();
 
         var colors = colorMap.GroupBy(x => x.TaskDefinitionId)
-                             .ToDictionary(g => g.Key, g => g.First()!.Color);
+                             .ToDictionary(g => g.Key, g => g.First().Color);
 
         var results = new List<WeeklyItemDTO>();
         foreach (var i in items) {
-            if (i != null)
-#pragma warning disable CS8602
-                results.Add(i.ToWeeklyItem(colors.GetValueOrDefault(i.TaskDefinitionId)));
-#pragma warning restore CS8602
+            results.Add(i.ToWeeklyItem(colors.GetValueOrDefault(i.TaskDefinitionId)));
         }
         return results;
     }
@@ -183,7 +176,7 @@ public class DailyPlanService : IDailyPlanService {
             .Select(i => i.TaskList!.Color)
             .FirstOrDefaultAsync();
 
-        return weeklyOccurrence!.ToWeeklyItem(color);
+        return weeklyOccurrence.ToWeeklyItem(color);
     }
 
     public async Task<List<MonthlyItemDTO>> GetAllMonthlyAsync(DateOnly date) {
@@ -202,18 +195,15 @@ public class DailyPlanService : IDailyPlanService {
         var taskDefIds = items.Select(i => i.TaskDefinitionId).Distinct().ToList();
         var colorMap = await context.TaskListItems.AsNoTracking()
             .Where(i => taskDefIds.Contains(i.TaskDefinitionId))
-            .Select(i => new { i.TaskDefinitionId, i.TaskList.Color })
+            .Select(i => new { i.TaskDefinitionId, Color = i.TaskList == null ? null : i.TaskList.Color })
             .ToListAsync();
 
         var colors = colorMap.GroupBy(x => x.TaskDefinitionId)
-                             .ToDictionary(g => g.Key, g => g.First()!.Color);
+                             .ToDictionary(g => g.Key, g => g.First().Color);
 
         var results = new List<MonthlyItemDTO>();
         foreach (var i in items) {
-            if (i != null)
-#pragma warning disable CS8602
-                results.Add(i.ToMonthlyItem(colors.GetValueOrDefault(i.TaskDefinitionId)));
-#pragma warning restore CS8602
+            results.Add(i.ToMonthlyItem(colors.GetValueOrDefault(i.TaskDefinitionId)));
         }
         return results;
     }
@@ -247,7 +237,7 @@ public class DailyPlanService : IDailyPlanService {
             .Select(i => i.TaskList!.Color)
             .FirstOrDefaultAsync();
 
-        return monthlyOccurrence!.ToMonthlyItem(color);
+        return monthlyOccurrence.ToMonthlyItem(color);
     }
 
     private static TaskDefinition CreateTaskDefinition(string title, string? description) {

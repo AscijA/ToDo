@@ -14,18 +14,16 @@
 					  Label=""
 					  Margin="Margin.Dense"
 					  Dense="true"
-					  Class="flex-grow-0"
-					  Clearable="true"
-					  FitContent="true"
-					  RelativeWidth="DropdownWidth.Adaptive">
-			<MudSelectItem T="DayOfWeek?" Value="@null"></MudSelectItem>
-			<MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Sunday">Sunday</MudSelectItem>
-			<MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Monday">Monday</MudSelectItem>
-			<MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Tuesday">Tuesday</MudSelectItem>
-			<MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Wednesday">Wednesday</MudSelectItem>
-			<MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Thursday">Thursday</MudSelectItem>
-			<MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Friday">Friday</MudSelectItem>
-			<MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Saturday">Saturday</MudSelectItem>
+					  Class="weekly-day-select"
+					  Style="width: 68px; min-width: 68px;">
+			<MudSelectItem T="DayOfWeek?" Value="@null">&nbsp</MudSelectItem>
+			<MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Monday">Mon</MudSelectItem>
+			<MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Tuesday">Tue</MudSelectItem>
+			<MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Wednesday">Wed</MudSelectItem>
+			<MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Thursday">Thu</MudSelectItem>
+			<MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Friday">Fri</MudSelectItem>
+			<MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Saturday">Sat</MudSelectItem>
+			<MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Sunday">Sun</MudSelectItem>
 		</MudSelect>
 	</Schedule>
 </PlannerItemCard>
