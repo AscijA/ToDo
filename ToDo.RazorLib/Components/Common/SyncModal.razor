@@ -1,6 +1,7 @@
 @using ToDo.RazorLib.Services
 @inject ISyncService SyncService
 @inject ISyncTransportService SyncTransportService
+@implements IDisposable
 
 <MudDialog>
 	<DialogContent>
@@ -46,6 +47,32 @@
 						}
 					</MudStack>
 				</MudPaper>
+
+				@if (_incomingPairingRequests.Count > 0) {
+					<MudText Typo="Typo.subtitle1">Incoming pairing requests</MudText>
+					@foreach (var request in _incomingPairingRequests) {
+						<MudPaper Class="pa-3" Elevation="0" Outlined="true">
+							<MudStack Spacing="2">
+								<MudText Typo="Typo.subtitle2">@request.DeviceName wants to pair</MudText>
+								<MudText Typo="Typo.caption" Color="Color.Secondary">@request.Address</MudText>
+								<MudText Typo="Typo.body2">Confirm this code matches on the other device.</MudText>
+								<MudText Typo="Typo.h5" Align="Align.Center">@request.VerificationCode</MudText>
+								@if (request.IsApproved) {
+									<MudText Typo="Typo.caption" Color="Color.Success">Approved. Waiting for the other device to confirm.</MudText>
+								}
+								<div class="d-flex justify-end gap-2">
+									<MudButton Size="Size.Small" OnClick="@(() => RejectIncomingPairing(request.SessionId))">Reject</MudButton>
+									<MudButton Size="Size.Small"
+												 Color="Color.Primary"
+												 Disabled="@request.IsApproved"
+												 OnClick="@(() => ApproveIncomingPairing(request.SessionId))">
+										Approve
+									</MudButton>
+								</div>
+							</MudStack>
+						</MudPaper>
+					}
+				}
 
 				<div class="d-flex align-center">
 					<MudText Typo="Typo.subtitle1">Available devices</MudText>
@@ -159,11 +186,14 @@
 	private string _manualAddress = string.Empty;
 	private IReadOnlyList<AvailableSyncDevice> _availableDevices = Array.Empty<AvailableSyncDevice>();
 	private IReadOnlyList<PairedSyncDevice> _pairedDevices = Array.Empty<PairedSyncDevice>();
+	private IReadOnlyList<IncomingPairingRequest> _incomingPairingRequests = Array.Empty<IncomingPairingRequest>();
 	private SyncPairingSession? _pairingSession;
 	private SyncTransportStatus _transportStatus = new(false, null, null, null, null);
 	private string _pairingCodeConfirmation = string.Empty;
 	private string? _discoveryMessage;
 	private string? _pairingMessage;
+	private PeriodicTimer? _incomingPairingTimer;
+	private CancellationTokenSource? _incomingPairingTimerCancellation;
 	private bool _isDiscovering;
 
 	protected override async Task OnInitializedAsync() {
@@ -175,6 +205,8 @@
 		_manualAddress = identity.ManualAddress;
 		_pairedDevices = SyncService.GetPairedDevices();
 		await ApplyTransportStateAsync();
+		RefreshIncomingPairingRequests();
+		StartIncomingPairingRefresh();
 
 		await RefreshAvailableDevicesAsync();
 	}
@@ -247,6 +279,7 @@
 		}
 
 		_transportStatus = SyncTransportService.GetStatus();
+		RefreshIncomingPairingRequests();
 	}
 
 	private async Task StartPairingAsync(AvailableSyncDevice device) {
@@ -311,6 +344,43 @@
 		await RefreshAvailableDevicesAsync();
 	}
 
+	private void ApproveIncomingPairing(string sessionId) {
+		SyncTransportService.ApproveIncomingPairing(sessionId);
+		RefreshIncomingPairingRequests();
+	}
+
+	private void RejectIncomingPairing(string sessionId) {
+		SyncTransportService.RejectIncomingPairing(sessionId);
+		RefreshIncomingPairingRequests();
+	}
+
+	private void RefreshIncomingPairingRequests() {
+		_incomingPairingRequests = SyncTransportService.GetIncomingPairingRequests();
+	}
+
+	private void StartIncomingPairingRefresh() {
+		_incomingPairingTimerCancellation = new CancellationTokenSource();
+		_incomingPairingTimer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+		_ = RunIncomingPairingRefreshAsync(_incomingPairingTimerCancellation.Token);
+	}
+
+	private async Task RunIncomingPairingRefreshAsync(CancellationToken cancellationToken) {
+		if (_incomingPairingTimer == null) {
+			return;
+		}
+
+		try {
+			while (await _incomingPairingTimer.WaitForNextTickAsync(cancellationToken)) {
+				await InvokeAsync(() => {
+					RefreshIncomingPairingRequests();
+					StateHasChanged();
+				});
+			}
+		}
+		catch (OperationCanceledException) {
+		}
+	}
+
 	private bool CanConfirmPairing() {
 		return _pairingSession != null
 			&& _pairingSession.ExpiresAt >= DateTimeOffset.Now
@@ -338,5 +408,11 @@
 		return _transportStatus is { IsRunning: true, Address: not null, Port: not null }
 			? $"{_transportStatus.Address}:{_transportStatus.Port}"
 			: string.Empty;
+	}
+
+	public void Dispose() {
+		_incomingPairingTimerCancellation?.Cancel();
+		_incomingPairingTimerCancellation?.Dispose();
+		_incomingPairingTimer?.Dispose();
 	}
 }

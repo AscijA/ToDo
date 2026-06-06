@@ -31,6 +31,36 @@ public sealed class LocalHttpSyncTransportService : ISyncTransportService {
         }
     }
 
+    public IReadOnlyList<IncomingPairingRequest> GetIncomingPairingRequests() {
+        lock (gate) {
+            RemoveExpiredPairings();
+            return pendingPairings
+                .Select(pairing => new IncomingPairingRequest(
+                    pairing.Key,
+                    pairing.Value.DeviceId,
+                    pairing.Value.DeviceName,
+                    pairing.Value.Address,
+                    pairing.Value.VerificationCode,
+                    pairing.Value.ExpiresAt,
+                    pairing.Value.IsApproved))
+                .ToList();
+        }
+    }
+
+    public void ApproveIncomingPairing(string sessionId) {
+        lock (gate) {
+            if (pendingPairings.TryGetValue(sessionId, out var pending) && pending.ExpiresAt >= DateTimeOffset.Now) {
+                pendingPairings[sessionId] = pending with { IsApproved = true };
+            }
+        }
+    }
+
+    public void RejectIncomingPairing(string sessionId) {
+        lock (gate) {
+            pendingPairings.Remove(sessionId);
+        }
+    }
+
     public async Task StartAsync(SyncDeviceIdentity identity, CancellationToken cancellationToken = default) {
         if (!identity.SyncEnabled) {
             await StopAsync();
@@ -209,7 +239,8 @@ public sealed class LocalHttpSyncTransportService : ISyncTransportService {
                 request.Address,
                 code,
                 expiresAt,
-                remoteTrustToken);
+                remoteTrustToken,
+                false);
         }
 
         var currentStatus = GetStatus();
@@ -240,6 +271,11 @@ public sealed class LocalHttpSyncTransportService : ISyncTransportService {
 
         if (pending == null || pending.ExpiresAt < DateTimeOffset.Now) {
             await WriteResponseAsync(stream, 404, "Not Found", "text/plain", "Pairing session expired", cancellationToken);
+            return;
+        }
+
+        if (!pending.IsApproved) {
+            await WriteResponseAsync(stream, 409, "Conflict", "text/plain", "Pairing request is waiting for approval", cancellationToken);
             return;
         }
 
@@ -352,7 +388,18 @@ public sealed class LocalHttpSyncTransportService : ISyncTransportService {
         string Address,
         string VerificationCode,
         DateTimeOffset ExpiresAt,
-        string RemoteTrustToken);
+        string RemoteTrustToken,
+        bool IsApproved);
+
+    private void RemoveExpiredPairings() {
+        var now = DateTimeOffset.Now;
+        foreach (var expiredSessionId in pendingPairings
+                     .Where(pairing => pairing.Value.ExpiresAt < now)
+                     .Select(pairing => pairing.Key)
+                     .ToList()) {
+            pendingPairings.Remove(expiredSessionId);
+        }
+    }
 
     private static async Task WriteResponseAsync(
         NetworkStream stream,

@@ -73,3 +73,12 @@ public sealed record SyncPairConfirmResponse(
     string DeviceName,
     string Address,
     string TrustToken);
+
+public sealed record IncomingPairingRequest(
+    string SessionId,
+    string DeviceId,
+    string DeviceName,
+    string Address,
+    string VerificationCode,
+    DateTimeOffset ExpiresAt,
+    bool IsApproved);
