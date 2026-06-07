@@ -122,7 +122,8 @@
 							<MudText Typo="Typo.h5" Align="Align.Center">@_pairingSession.VerificationCode</MudText>
 							<MudTextField @bind-Value="_pairingCodeConfirmation"
 											  Label="Code from other device"
-											  Placeholder="000-000" />
+											  Placeholder="000-000"
+											  Mask="@pairingCodeMask"/>
 							@if (!string.IsNullOrWhiteSpace(_pairingMessage)) {
 								<MudAlert Severity="Severity.Warning" Dense="true">@_pairingMessage</MudAlert>
 							}
@@ -164,6 +165,18 @@
 											</MudText>
 										</MudStack>
 										<MudSpacer />
+										<MudButton Size="Size.Small"
+													 Color="Color.Primary"
+													 Variant="Variant.Text"
+													 Disabled="@(_pingingDeviceId == device.DeviceId)"
+													 OnClick="@(() => PingPairedDevice(device))">
+											@if (_pingingDeviceId == device.DeviceId) {
+												<MudProgressCircular Size="Size.Small" Indeterminate="true" />
+											}
+											else {
+												<span>Ping</span>
+											}
+										</MudButton>
 										<MudIconButton Icon="@Icons.Material.Filled.Delete"
 															aria-label="Remove paired device"
 															Size="Size.Small"
@@ -175,6 +188,9 @@
 						</MudList>
 					}
 				</MudPaper>
+				@if (!string.IsNullOrWhiteSpace(_pingMessage)) {
+					<MudAlert Severity="@_pingSeverity" Dense="true">@_pingMessage</MudAlert>
+				}
 			</MudStack>
 		</div>
 	</DialogContent>
@@ -200,9 +216,13 @@
 	private string _pairingCodeConfirmation = string.Empty;
 	private string? _discoveryMessage;
 	private string? _pairingMessage;
+	private string? _pingMessage;
+	private Severity _pingSeverity = Severity.Info;
+	private string? _pingingDeviceId;
 	private PeriodicTimer? _incomingPairingTimer;
 	private CancellationTokenSource? _incomingPairingTimerCancellation;
 	private bool _isDiscovering;
+	private IMask pairingCodeMask = new PatternMask("000-000");
 	private bool _isPairingBusy;
 
 	protected override async Task OnInitializedAsync() {
@@ -362,6 +382,26 @@
 		SyncService.RemovePairedDevice(deviceId);
 		_pairedDevices = SyncService.GetPairedDevices();
 		await RefreshAvailableDevicesAsync();
+	}
+
+	private async Task PingPairedDevice(PairedSyncDevice device) {
+		_pingMessage = null;
+		_pingingDeviceId = device.DeviceId;
+
+		try {
+			var updatedDevice = await SyncService.PingPairedDeviceAsync(device);
+			_pairedDevices = SyncService.GetPairedDevices();
+			_pingSeverity = Severity.Success;
+			_pingMessage = $"{updatedDevice.DeviceName} responded.";
+		}
+		catch (Exception ex) {
+			_pairedDevices = SyncService.GetPairedDevices();
+			_pingSeverity = Severity.Warning;
+			_pingMessage = ex.Message;
+		}
+		finally {
+			_pingingDeviceId = null;
+		}
 	}
 
 	private void ApproveIncomingPairing(string sessionId) {

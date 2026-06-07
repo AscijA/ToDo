@@ -136,10 +136,43 @@ public sealed class LocalSyncService : ISyncService {
             DateTimeOffset.Now,
             null,
             true,
-            pairConfirm.TrustToken));
+            session.TrustToken));
 
         SavePairedDevices(devices);
         return true;
+    }
+
+    public async Task<PairedSyncDevice> PingPairedDeviceAsync(
+        PairedSyncDevice device,
+        CancellationToken cancellationToken = default) {
+        var localDevice = GetLocalDevice();
+        using var httpClient = CreatePairingClient();
+        var response = await PostJsonAsync(
+            httpClient,
+            $"http://{device.Address}/sync/ping",
+            new SyncPingRequest(localDevice.DeviceId, device.TrustToken),
+            cancellationToken);
+
+        if (!response.IsSuccessStatusCode) {
+            var error = await response.Content.ReadAsStringAsync(cancellationToken);
+            var offlineDevice = device with { IsOnline = false };
+            AddOrReplacePairedDevice(offlineDevice);
+            throw new InvalidOperationException($"Ping failed: {(int)response.StatusCode} {response.ReasonPhrase}. {error}");
+        }
+
+        var ping = await response.Content.ReadFromJsonAsync<SyncPingResponse>(cancellationToken);
+        if (ping == null || !string.Equals(ping.DeviceId, device.DeviceId, StringComparison.OrdinalIgnoreCase)) {
+            var offlineDevice = device with { IsOnline = false };
+            AddOrReplacePairedDevice(offlineDevice);
+            throw new InvalidOperationException("Ping returned an invalid device identity.");
+        }
+
+        var onlineDevice = device with {
+            DeviceName = ping.DeviceName,
+            IsOnline = true
+        };
+        AddOrReplacePairedDevice(onlineDevice);
+        return onlineDevice;
     }
 
     public void RemovePairedDevice(string deviceId) {
@@ -171,6 +204,14 @@ public sealed class LocalSyncService : ISyncService {
 
     private void SavePairedDevices(IReadOnlyList<PairedSyncDevice> devices) {
         settings.Set(PairedDevicesKey, JsonSerializer.Serialize(devices));
+    }
+
+    private void AddOrReplacePairedDevice(PairedSyncDevice device) {
+        var devices = LoadPairedDevices()
+            .Where(existing => !string.Equals(existing.DeviceId, device.DeviceId, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        devices.Add(device);
+        SavePairedDevices(devices);
     }
 
     private static string GenerateTrustToken() {

@@ -74,6 +74,15 @@ public sealed record SyncPairConfirmResponse(
     string Address,
     string TrustToken);
 
+public sealed record SyncPingRequest(
+    string DeviceId,
+    string TrustToken);
+
+public sealed record SyncPingResponse(
+    string DeviceId,
+    string DeviceName,
+    DateTimeOffset ServerTime);
+
 public sealed record IncomingPairingRequest(
     string SessionId,
     string DeviceId,

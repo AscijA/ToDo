@@ -189,6 +189,13 @@ public sealed class LocalHttpSyncTransportService : ISyncTransportService {
             return;
         }
 
+        if (string.Equals(method, "POST", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(path, "/sync/ping", StringComparison.OrdinalIgnoreCase)) {
+            var body = await ReadBodyAsync(reader, cancellationToken);
+            await HandlePingAsync(stream, body, cancellationToken);
+            return;
+        }
+
         if (!string.Equals(method, "GET", StringComparison.OrdinalIgnoreCase) && !string.Equals(method, "POST", StringComparison.OrdinalIgnoreCase)) {
             await WriteResponseAsync(stream, 405, "Method Not Allowed", "text/plain", "Method not allowed", cancellationToken);
             return;
@@ -302,7 +309,37 @@ public sealed class LocalHttpSyncTransportService : ISyncTransportService {
         var responseAddress = currentStatus is { Address: not null, Port: not null }
             ? $"{currentStatus.Address}:{currentStatus.Port}"
             : string.Empty;
-        var response = new SyncPairConfirmResponse(identity.DeviceId, identity.DeviceName, responseAddress, pending.RemoteTrustToken);
+        var response = new SyncPairConfirmResponse(identity.DeviceId, identity.DeviceName, responseAddress, request.TrustToken);
+        await WriteJsonResponseAsync(stream, response, cancellationToken);
+    }
+
+    private async Task HandlePingAsync(NetworkStream stream, string body, CancellationToken cancellationToken) {
+        var identity = currentIdentity;
+        if (identity == null) {
+            await WriteResponseAsync(stream, 503, "Service Unavailable", "text/plain", "Sync is not available", cancellationToken);
+            return;
+        }
+
+        var request = DeserializeBody<SyncPingRequest>(body);
+        if (request == null || string.IsNullOrWhiteSpace(request.DeviceId) || string.IsNullOrWhiteSpace(request.TrustToken)) {
+            await WriteResponseAsync(stream, 400, "Bad Request", "text/plain", "Invalid ping request", cancellationToken);
+            return;
+        }
+
+        var pairedDevice = LoadPairedDevices()
+            .FirstOrDefault(device => string.Equals(device.DeviceId, request.DeviceId, StringComparison.OrdinalIgnoreCase));
+
+        if (pairedDevice == null) {
+            await WriteResponseAsync(stream, 401, "Unauthorized", "text/plain", "Device is not paired", cancellationToken);
+            return;
+        }
+
+        if (!string.Equals(pairedDevice.TrustToken, request.TrustToken, StringComparison.Ordinal)) {
+            await WriteResponseAsync(stream, 403, "Forbidden", "text/plain", "Invalid trust token", cancellationToken);
+            return;
+        }
+
+        var response = new SyncPingResponse(identity.DeviceId, identity.DeviceName, DateTimeOffset.Now);
         await WriteJsonResponseAsync(stream, response, cancellationToken);
     }
 
@@ -354,16 +391,31 @@ public sealed class LocalHttpSyncTransportService : ISyncTransportService {
     }
 
     private void AddOrReplacePairedDevice(PairedSyncDevice device) {
-        const string key = "Sync_PairedDevices";
-        var json = settings.Get(key, "");
-        var devices = string.IsNullOrWhiteSpace(json)
-            ? []
-            : JsonSerializer.Deserialize<List<PairedSyncDevice>>(json) ?? [];
-
+        var devices = LoadPairedDevices();
         devices = devices
             .Where(existing => !string.Equals(existing.DeviceId, device.DeviceId, StringComparison.OrdinalIgnoreCase))
             .ToList();
         devices.Add(device);
+        SavePairedDevices(devices);
+    }
+
+    private List<PairedSyncDevice> LoadPairedDevices() {
+        const string key = "Sync_PairedDevices";
+        var json = settings.Get(key, "");
+        if (string.IsNullOrWhiteSpace(json)) {
+            return [];
+        }
+
+        try {
+            return JsonSerializer.Deserialize<List<PairedSyncDevice>>(json) ?? [];
+        }
+        catch (JsonException) {
+            return [];
+        }
+    }
+
+    private void SavePairedDevices(IReadOnlyList<PairedSyncDevice> devices) {
+        const string key = "Sync_PairedDevices";
         settings.Set(key, JsonSerializer.Serialize(devices));
     }
 
