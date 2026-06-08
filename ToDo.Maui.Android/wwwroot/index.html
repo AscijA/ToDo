@@ -1,20 +1,69 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>To Do</title>
-    <base href="/" />
-    <link rel="stylesheet" href="_content/ToDo.RazorLib/app.css" />
-    <link rel="stylesheet" href="app.css" />
-    <link rel="stylesheet" href="ToDo.Maui.Android.styles.css" />
-    <link rel="icon" type="image/png" href="favicon.png" />
+   <meta charset="utf-8" />
+   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+   <title>ToDo AscijA</title>
+   <base href="/" />
+   <link rel="stylesheet" href="app.css" />
+   <link rel="stylesheet" href="ToDo.Maui.Android.styles.css" />
+   <link rel="stylesheet" href="_content/ToDo.RazorLib/app.css" />
+   <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" rel="stylesheet" />
+   <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
+   <link rel="icon" href="data:,">
+   <script>
+      (function () {
+         var bg = localStorage.getItem('theme_background');
+         var pr = localStorage.getItem('theme_primary');
+         var isDark = localStorage.getItem('theme_isDark');
+         if (!bg) {
+            var systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            bg = systemDark ? '#282C34' : '#F5F5F5';
+            pr = '#C678DD';
+         }
+         document.documentElement.style.setProperty('--splash-bg', bg);
+         document.documentElement.style.setProperty('--splash-primary', pr || '#C678DD');
+      })();
+   </script>
+   <style>
+      html, body { height: 100%; margin: 0; background: var(--splash-bg); }
+      .splash-loader {
+         min-height: 100vh;
+         display: flex;
+         align-items: center;
+         justify-content: center;
+         background: var(--splash-bg);
+      }
+      .splash-spinner {
+         width: 48px; height: 48px;
+         border: 4px solid transparent;
+         border-top-color: var(--splash-primary);
+         border-radius: 50%;
+         animation: spin 0.8s linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+   </style>
 </head>
 
 <body>
-    <div id="app">Loading...</div>
-    <script src="_framework/blazor.webview.js" autostart="false"></script>
+
+   <div class="status-bar-safe-area"></div>
+
+   <div id="app">
+      <div class="splash-loader">
+         <div class="splash-spinner"></div>
+      </div>
+   </div>
+
+   <div id="blazor-error-ui" data-nosnippet>
+      An unhandled error has occurred.
+      <a href="." class="reload">Reload</a>
+      <span class="dismiss">🗙</span>
+   </div>
+
+   <script src="_framework/blazor.webview.js" autostart="false"></script>
+   <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+   <script src="_content/ToDo.RazorLib/theme-store.js"></script>
 </body>
 
 </html>

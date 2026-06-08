@@ -1,136 +1,152 @@
 @using ToDo.RazorLib.Services
 @inject ISettingsService SettingsService
+@inject ThemeStoreInterop ThemeStore
 
 
 <MudDialog>
-	<DialogContent>
-		<div @onkeydown="HandleKeyDown">
-			<MudStack Spacing="4">
-				<MudSelect T="string" @bind-Value="_appearance" Label="Appearance">
-					<MudSelectItem Value="@("Light")">Light</MudSelectItem>
-					<MudSelectItem Value="@("Dark")">Dark</MudSelectItem>
-					<MudSelectItem Value="@("System")">Follow System</MudSelectItem>
-				</MudSelect>
+   <DialogContent>
+      <div @onkeydown="HandleKeyDown">
+         <MudStack Spacing="4">
+            <MudSelect T="string" @bind-Value="_appearance" Label="Appearance">
+               <MudSelectItem Value="@("Light")">Light</MudSelectItem>
+               <MudSelectItem Value="@("Dark")">Dark</MudSelectItem>
+               <MudSelectItem Value="@("System")">Follow System</MudSelectItem>
+            </MudSelect>
 
-				<MudSelect T="string" @bind-Value="_themeName" Label="Theme">
-					<MudSelectItem Value="@("ODP")">One Dark Pro</MudSelectItem>
-					<MudSelectItem Value="@("Solarized")">Solarized</MudSelectItem>
-					<MudSelectItem Value="@("Blue")">Blue Night</MudSelectItem>
-					<MudSelectItem Value="@("Green")">Green</MudSelectItem>
-					<MudSelectItem Value="@("Custom")">Custom</MudSelectItem>
-				</MudSelect>
+            <MudSelect T="string" @bind-Value="_themeName" Label="Theme">
+               <MudSelectItem Value="@("ODP")">One Dark Pro</MudSelectItem>
+               <MudSelectItem Value="@("Solarized")">Solarized</MudSelectItem>
+               <MudSelectItem Value="@("Blue")">Blue Night</MudSelectItem>
+               <MudSelectItem Value="@("Green")">Green</MudSelectItem>
+               <MudSelectItem Value="@("Custom")">Custom</MudSelectItem>
+            </MudSelect>
 
-				@if (_themeName == "Custom") {
-					<MudGrid>
-						<MudItem xs="6">
-							<MudColorPicker @bind-Text="_customPrimary" Label="Primary" Style="@($"color: {_customPrimary};")" />
-						</MudItem>
-						<MudItem xs="6">
-							<MudColorPicker @bind-Text="_customSecondary" Label="Secondary" Style="@($"color: {_customSecondary};")" />
-						</MudItem>
-						<MudItem xs="6">
-							<MudColorPicker @bind-Text="_customBackground" Label="Background" Style="@($"color: {_customBackground};")" />
-						</MudItem>
-						<MudItem xs="6">
-							<MudColorPicker @bind-Text="_customSurface" Label="Surface" Style="@($"color: {_customSurface};")" />
-						</MudItem>
-					</MudGrid>
-				}
+            @if (_themeName == "Custom") {
+               <MudGrid>
+                  <MudItem xs="6">
+                     <MudColorPicker @bind-Text="_customPrimary" Label="Primary" Style="@($"color: {_customPrimary};")" />
+                  </MudItem>
+                  <MudItem xs="6">
+                     <MudColorPicker @bind-Text="_customSecondary" Label="Secondary" Style="@($"color: {_customSecondary};")" />
+                  </MudItem>
+                  <MudItem xs="6">
+                     <MudColorPicker @bind-Text="_customBackground" Label="Background" Style="@($"color: {_customBackground};")" />
+                  </MudItem>
+                  <MudItem xs="6">
+                     <MudColorPicker @bind-Text="_customSurface" Label="Surface" Style="@($"color: {_customSurface};")" />
+                  </MudItem>
+               </MudGrid>
+            }
 
-				<MudDivider />
+            <MudDivider />
 
-				<MudText Typo="Typo.h6">Layout</MudText>
+            @if (!(OperatingSystem.IsAndroid() || OperatingSystem.IsIOS())) {
+               <MudText Typo="Typo.h6">Layout</MudText>
+				
+               <MudSwitch T="bool" @bind-Value="_bigOnLeft" Label="Big Container on Left" Color="Color.Primary" />
+               <MudSwitch T="bool" @bind-Value="_minimizeToTray" Label="Minimize to Tray on Close" Color="Color.Primary" />
 
-				<MudSwitch T="bool" @bind-Value="_bigOnLeft" Label="Big Container on Left" Color="Color.Primary" />
-				@if (!(OperatingSystem.IsAndroid() || OperatingSystem.IsIOS())) {
-					<MudSwitch T="bool" @bind-Value="_minimizeToTray" Label="Minimize to Tray on Close" Color="Color.Primary" />
-				}
 
-				<MudSelect T="string" @bind-Value="_slotBig" Label="Big Slot">
-					<MudSelectItem Value="@("Daily")">Daily Planner</MudSelectItem>
-					<MudSelectItem Value="@("Weekly")">Weekly Planner</MudSelectItem>
-					<MudSelectItem Value="@("Monthly")">Monthly Planner</MudSelectItem>
-				</MudSelect>
+               <MudSelect T="string" @bind-Value="_slotBig" Label="Big Slot">
+                  <MudSelectItem Value="@("Daily")">Daily Planner</MudSelectItem>
+                  <MudSelectItem Value="@("Weekly")">Weekly Planner</MudSelectItem>
+                  <MudSelectItem Value="@("Monthly")">Monthly Planner</MudSelectItem>
+               </MudSelect>
 
-				<MudSelect T="string" @bind-Value="_slotSmallTop" Label="Small Top Slot">
-					<MudSelectItem Value="@("Daily")">Daily Planner</MudSelectItem>
-					<MudSelectItem Value="@("Weekly")">Weekly Planner</MudSelectItem>
-					<MudSelectItem Value="@("Monthly")">Monthly Planner</MudSelectItem>
-				</MudSelect>
+               <MudSelect T="string" @bind-Value="_slotSmallTop" Label="Small Top Slot">
+                  <MudSelectItem Value="@("Daily")">Daily Planner</MudSelectItem>
+                  <MudSelectItem Value="@("Weekly")">Weekly Planner</MudSelectItem>
+                  <MudSelectItem Value="@("Monthly")">Monthly Planner</MudSelectItem>
+               </MudSelect>
 
-				<MudSelect T="string" @bind-Value="_slotSmallBottom" Label="Small Bottom Slot">
-					<MudSelectItem Value="@("Daily")">Daily Planner</MudSelectItem>
-					<MudSelectItem Value="@("Weekly")">Weekly Planner</MudSelectItem>
-					<MudSelectItem Value="@("Monthly")">Monthly Planner</MudSelectItem>
-				</MudSelect>
-
-			</MudStack>
-		</div>
-	</DialogContent>
-	<DialogActions>
-		<MudButton OnClick="Cancel">Cancel</MudButton>
-		<MudButton Color="Color.Primary" OnClick="Submit">Save</MudButton>
-	</DialogActions>
+               <MudSelect T="string" @bind-Value="_slotSmallBottom" Label="Small Bottom Slot">
+                  <MudSelectItem Value="@("Daily")">Daily Planner</MudSelectItem>
+                  <MudSelectItem Value="@("Weekly")">Weekly Planner</MudSelectItem>
+                  <MudSelectItem Value="@("Monthly")">Monthly Planner</MudSelectItem>
+               </MudSelect>
+            }
+         </MudStack>
+      </div>
+   </DialogContent>
+   <DialogActions>
+      <MudButton OnClick="Cancel">Cancel</MudButton>
+      <MudButton Color="Color.Primary" OnClick="Submit">Save</MudButton>
+   </DialogActions>
 </MudDialog>
 
 @code {
-	[CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+   [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
 
-	private string _appearance = "System";
-	private string _themeName = "ODP";
-	private bool _bigOnLeft = true;
-	private string _slotBig = "Daily";
-	private string _slotSmallTop = "Weekly";
-	private string _slotSmallBottom = "Monthly";
-	private bool _minimizeToTray = false;
+   private string _appearance = "System";
+   private string _themeName = "ODP";
+   private bool _bigOnLeft = true;
+   private string _slotBig = "Daily";
+   private string _slotSmallTop = "Weekly";
+   private string _slotSmallBottom = "Monthly";
+   private bool _minimizeToTray = false;
 
-	private string _customPrimary = "#C678DD";
-	private string _customSecondary = "#61AFEF";
-	private string _customBackground = "#282C34";
-	private string _customSurface = "#21252B";
+   private string _customPrimary = "#C678DD";
+   private string _customSecondary = "#61AFEF";
+   private string _customBackground = "#282C34";
+   private string _customSurface = "#21252B";
 
-	protected override void OnInitialized() {
-		_appearance = SettingsService.Get("Appearance", "System");
-		_themeName = SettingsService.Get("Theme", "ODP");
-		_bigOnLeft = SettingsService.Get("BigOnLeft", "true") == "true";
-		_minimizeToTray = SettingsService.Get("MinimizeToTray", "false") == "true";
-		_slotBig = SettingsService.Get("Slot_Big", "Daily");
-		_slotSmallTop = SettingsService.Get("Slot_SmallTop", "Weekly");
-		_slotSmallBottom = SettingsService.Get("Slot_SmallBottom", "Monthly");
+   protected override void OnInitialized() {
+      _appearance = SettingsService.Get("Appearance", "System");
+      _themeName = SettingsService.Get("Theme", "ODP");
+      _bigOnLeft = SettingsService.Get("BigOnLeft", "true") == "true";
+      _minimizeToTray = SettingsService.Get("MinimizeToTray", "false") == "true";
+      _slotBig = SettingsService.Get("Slot_Big", "Daily");
+      _slotSmallTop = SettingsService.Get("Slot_SmallTop", "Weekly");
+      _slotSmallBottom = SettingsService.Get("Slot_SmallBottom", "Monthly");
 
-		_customPrimary = SettingsService.Get("Custom_Primary", "#C678DD");
-		_customSecondary = SettingsService.Get("Custom_Secondary", "#61AFEF");
-		_customBackground = SettingsService.Get("Custom_Background", "#282C34");
-		_customSurface = SettingsService.Get("Custom_Surface", "#21252B");
-	}
+      _customPrimary = SettingsService.Get("Custom_Primary", "#C678DD");
+      _customSecondary = SettingsService.Get("Custom_Secondary", "#61AFEF");
+      _customBackground = SettingsService.Get("Custom_Background", "#282C34");
+      _customSurface = SettingsService.Get("Custom_Surface", "#21252B");
+   }
 
-	private void Cancel() => MudDialog.Cancel();
+   private void Cancel() => MudDialog.Cancel();
 
-	private void HandleKeyDown(KeyboardEventArgs args) {
-		if (args.Key == "Escape") {
-			Cancel();
-			return;
-		}
+   private void HandleKeyDown(KeyboardEventArgs args) {
+      if (args.Key == "Escape") {
+         Cancel();
+         return;
+      }
 
-		if (args.Key == "Enter") {
-			Submit();
-		}
-	}
+      if (args.Key == "Enter") {
+         _ = Submit();
+      }
+   }
 
-	private void Submit() {
-		SettingsService.Set("Appearance", _appearance);
-		SettingsService.Set("Theme", _themeName);
-		SettingsService.Set("BigOnLeft", _bigOnLeft.ToString().ToLower());
-		SettingsService.Set("MinimizeToTray", _minimizeToTray.ToString().ToLower());
-		SettingsService.Set("Slot_Big", _slotBig);
-		SettingsService.Set("Slot_SmallTop", _slotSmallTop);
-		SettingsService.Set("Slot_SmallBottom", _slotSmallBottom);
+   private async Task Submit() {
+      SettingsService.Set("Appearance", _appearance);
+      SettingsService.Set("Theme", _themeName);
+      SettingsService.Set("BigOnLeft", _bigOnLeft.ToString().ToLower());
+      SettingsService.Set("MinimizeToTray", _minimizeToTray.ToString().ToLower());
+      SettingsService.Set("Slot_Big", _slotBig);
+      SettingsService.Set("Slot_SmallTop", _slotSmallTop);
+      SettingsService.Set("Slot_SmallBottom", _slotSmallBottom);
 
-		SettingsService.Set("Custom_Primary", _customPrimary);
-		SettingsService.Set("Custom_Secondary", _customSecondary);
-		SettingsService.Set("Custom_Background", _customBackground);
-		SettingsService.Set("Custom_Surface", _customSurface);
+      SettingsService.Set("Custom_Primary", _customPrimary);
+      SettingsService.Set("Custom_Secondary", _customSecondary);
+      SettingsService.Set("Custom_Background", _customBackground);
+      SettingsService.Set("Custom_Surface", _customSurface);
 
-		MudDialog.Close(DialogResult.Ok(true));
-	}
+      await PersistSplashThemeAsync();
+
+      MudDialog.Close(DialogResult.Ok(true));
+   }
+
+   private async Task PersistSplashThemeAsync() {
+      var isDark = _appearance != "Light";
+      var theme = _themeName switch {
+         "Blue" => Themes.Blue,
+         "Solarized" => Themes.Solarized,
+         "Green" => Themes.Green,
+         "Custom" => Themes.CreateCustomTheme(_customPrimary, _customSecondary, _customBackground, _customSurface),
+         _ => Themes.OneDarkPro
+      };
+      var (primary, background) = Themes.GetColors(theme, isDark);
+      await ThemeStore.PersistAsync(primary, background, isDark);
+   }
 }

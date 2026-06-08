@@ -3,4 +3,6 @@ body,
 #app {
     height: 100%;
     margin: 0;
+    font-family: 'Roboto', Helvetica, Arial, sans-serif;
+    color: var(--mud-palette-text-primary);
 }

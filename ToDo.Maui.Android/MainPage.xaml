@@ -4,10 +4,12 @@
              xmlns:routes="clr-namespace:ToDo.RazorLib.Routes;assembly=ToDo.RazorLib"
              x:Class="ToDo.Maui.Android.MainPage">
 
-    <BlazorWebView x:Name="blazorWebView" HostPage="wwwroot/index.html">
-        <BlazorWebView.RootComponents>
-            <RootComponent Selector="#app" ComponentType="{x:Type routes:Index}" />
-        </BlazorWebView.RootComponents>
-    </BlazorWebView>
+    <Grid>
+        <BlazorWebView x:Name="blazorWebView" HostPage="wwwroot/index.html">
+            <BlazorWebView.RootComponents>
+                <RootComponent Selector="#app" ComponentType="{x:Type routes:MobileIndex}" />
+            </BlazorWebView.RootComponents>
+        </BlazorWebView>
+    </Grid>
 
 </ContentPage>

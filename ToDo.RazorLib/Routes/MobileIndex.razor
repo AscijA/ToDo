@@ -1,0 +1,275 @@
+@page "/mobile"
+@using ToDo.RazorLib.Components.DailyPlanner
+@using ToDo.RazorLib.Components.WeeklyPlanner
+@using ToDo.RazorLib.Components.MonthlyPlanner
+@using ToDo.RazorLib.Components.TaskList
+@using ToDo.RazorLib.Components.Common
+@using ToDo.Application.Contracts.DTOs
+@using ToDo.Application.Interfaces.Services
+@using ToDo.RazorLib.Services
+@inject ITaskListService ListService
+@inject IDialogService DialogService
+@inject ISettingsService SettingsService
+@inject SyncModalRequestService SyncModalRequests
+@inject ThemeStoreInterop ThemeStore
+@implements IDisposable
+
+<MudThemeProvider @ref="_mudThemeProvider"
+                 Theme="_currentTheme"
+                 @bind-IsDarkMode="_isDarkMode" />
+<MudDialogProvider />
+<MudSnackbarProvider />
+<MudPopoverProvider />
+
+<div class="mobile-shell">
+    <div class="mobile-content">
+        @switch (_activeTab) {
+            case 0:
+                <DailyPlanner />
+                break;
+            case 1:
+                <WeeklyPlanner />
+                break;
+            case 2:
+                <MonthlyPlanner />
+                break;
+            case 3:
+                @if (_selectedListId != Guid.Empty) {
+                    <TaskList ListId="_selectedListId"
+                              OnDeleted="OnListDeleted"
+                              OnUpdated="LoadTaskLists" />
+                }
+                else {
+                    <div class="mobile-list-picker">
+                        <MudText Typo="Typo.h6" Class="mb-3">Task Lists</MudText>
+                        @foreach (var list in _taskLists) {
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Primary"
+                                       FullWidth="true"
+                                       Class="mb-2 justify-start"
+                                       OnClick="() => SelectList(list.Id)">
+                                <MudAvatar Size="Size.Small"
+                                           Style="@($"background-color: {list.Color}; color: white;")">
+                                    @GetIconLetter(list.Name)
+                                </MudAvatar>
+                                <MudText Class="ml-2">@list.Name</MudText>
+                            </MudButton>
+                        }
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   FullWidth="true"
+                                   StartIcon="@Icons.Material.Filled.Add"
+                                   OnClick="AddNewList"
+                                   Class="mt-3">
+                            New List
+                        </MudButton>
+                    </div>
+                }
+                break;
+            case 4:
+                <div class="mobile-settings-tab pa-4">
+                    <MudText Typo="Typo.h6" Class="mb-3">Settings & Sync</MudText>
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Primary"
+                               FullWidth="true"
+                               StartIcon="@Icons.Material.Filled.Settings"
+                               OnClick="OpenSettings"
+                               Class="mb-3">
+                        Settings
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Primary"
+                               FullWidth="true"
+                               StartIcon="@Icons.Material.Filled.Sync"
+                               OnClick="OpenSync">
+                        Sync
+                    </MudButton>
+                </div>
+                break;
+        }
+    </div>
+
+    <div class="mobile-bottom-bar">
+        <button class="tab-btn @(_activeTab == 0 ? "active" : "")" @onclick="() => SetTab(0)">
+            <span class="tab-btn-icon">
+                <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Size="Size.Small" />
+                <span class="tab-badge">1</span>
+            </span>
+            <span class="tab-btn-label">Daily</span>
+        </button>
+        <button class="tab-btn @(_activeTab == 1 ? "active" : "")" @onclick="() => SetTab(1)">
+            <span class="tab-btn-icon">
+                <MudIcon Icon="@Icons.Material.Filled.CalendarViewWeek" Size="Size.Small" />
+                <span class="tab-badge">7</span>
+            </span>
+            <span class="tab-btn-label">Weekly</span>
+        </button>
+        <button class="tab-btn @(_activeTab == 2 ? "active" : "")" @onclick="() => SetTab(2)">
+            <span class="tab-btn-icon">
+                <MudIcon Icon="@Icons.Material.Filled.CalendarMonth" Size="Size.Small" />
+                <span class="tab-badge">31</span>
+            </span>
+            <span class="tab-btn-label">Monthly</span>
+        </button>
+        <button class="tab-btn @(_activeTab == 3 ? "active" : "")" @onclick="() => SetTab(3)" style="@GetListTabColorVar()">
+            <span class="tab-btn-icon">
+                <span class="tab-list-letter">@GetSelectedListLetter()</span>
+            </span>
+            <span class="tab-btn-label">Lists</span>
+        </button>
+        <button class="tab-btn @(_activeTab == 4 ? "active" : "")" @onclick="() => SetTab(4)">
+            <span class="tab-btn-icon">
+                <MudIcon Icon="@Icons.Material.Filled.Settings" Size="Size.Small" />
+            </span>
+            <span class="tab-btn-label">Settings</span>
+        </button>
+    </div>
+</div>
+
+@code {
+    private int _activeTab = 0;
+    private List<TaskListDto> _taskLists = new();
+    private Guid _selectedListId = Guid.Empty;
+
+    private MudThemeProvider? _mudThemeProvider;
+    private string _appearance = "System";
+    private bool _isDarkMode = true;
+    private MudTheme _currentTheme = Themes.OneDarkPro;
+
+    protected override async Task OnInitializedAsync() {
+        SyncModalRequests.OpenRequested += OnSyncModalRequested;
+        LoadSettings();
+        await LoadTaskLists();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender) {
+        if (firstRender) {
+            if (_appearance == "System" && _mudThemeProvider != null) {
+                await _mudThemeProvider.WatchSystemDarkModeAsync(OnSystemDarkModeChanged);
+                var systemDarkMode = await _mudThemeProvider.GetSystemDarkModeAsync();
+                if (_isDarkMode != systemDarkMode) {
+                    _isDarkMode = systemDarkMode;
+                }
+            }
+            await PersistThemeAsync();
+            StateHasChanged();
+        }
+    }
+
+    private async Task PersistThemeAsync() {
+        var (primary, background) = Themes.GetColors(_currentTheme, _isDarkMode);
+        await ThemeStore.PersistAsync(primary, background, _isDarkMode);
+    }
+
+    private void SetTab(int index) {
+        if (_activeTab == 3 && index == 3 && _selectedListId != Guid.Empty) {
+            _selectedListId = Guid.Empty;
+            return;
+        }
+        _activeTab = index;
+    }
+
+    private void LoadSettings() {
+        _appearance = SettingsService.Get("Appearance", "System");
+        if (_appearance == "Light")
+            _isDarkMode = false;
+        else if (_appearance == "Dark")
+            _isDarkMode = true;
+        // For "System", leave _isDarkMode at its current value — 
+        // it will be resolved in OnAfterRenderAsync
+        var themeName = SettingsService.Get("Theme", "ODP");
+        if (themeName == "Custom") {
+            var primary = SettingsService.Get("Custom_Primary", "#C678DD");
+            var secondary = SettingsService.Get("Custom_Secondary", "#61AFEF");
+            var background = SettingsService.Get("Custom_Background", "#282C34");
+            var surface = SettingsService.Get("Custom_Surface", "#21252B");
+            _currentTheme = Themes.CreateCustomTheme(primary, secondary, background, surface);
+        }
+        else {
+            _currentTheme = themeName switch {
+                "Blue" => Themes.Blue,
+                "Solarized" => Themes.Solarized,
+                "Green" => Themes.Green,
+                _ => Themes.OneDarkPro
+            };
+        }
+    }
+
+    private Task OnSystemDarkModeChanged(bool isDarkMode) {
+        if (_appearance == "System") {
+            _isDarkMode = isDarkMode;
+            _ = PersistThemeAsync();
+            StateHasChanged();
+        }
+        return Task.CompletedTask;
+    }
+
+    private async Task LoadTaskLists() {
+        for (int i = 0; i < 3; i++) {
+            try {
+                _taskLists = await ListService.GetAllAsync();
+                return;
+            }
+            catch {
+                if (i == 2) throw;
+                await Task.Delay(500);
+            }
+        }
+    }
+
+    private void SelectList(Guid id) {
+        _selectedListId = id;
+    }
+
+    private async Task AddNewList() {
+        var dialog = await DialogService.ShowAsync<TaskListModal>("New Task List");
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled && result.Data is TaskListModal.TaskListModalResult modalResult) {
+            var newList = await ListService.CreateAsync(modalResult.Name, modalResult.Color, modalResult.Description);
+            await LoadTaskLists();
+            SelectList(newList.Id);
+        }
+    }
+
+    private async Task OnListDeleted() {
+        await LoadTaskLists();
+        _selectedListId = Guid.Empty;
+    }
+
+    private async Task OpenSettings() {
+        var dialog = await DialogService.ShowAsync<SettingsModal>("Settings", new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled) {
+            LoadSettings();
+            StateHasChanged();
+        }
+    }
+
+    private async Task OpenSync() {
+        await DialogService.ShowAsync<SyncModal>("Sync", new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+    }
+
+    private void OnSyncModalRequested() {
+        _ = InvokeAsync(OpenSync);
+    }
+
+    private string GetIconLetter(string name) =>
+        string.IsNullOrWhiteSpace(name) ? "?" : name.Trim()[0].ToString().ToUpperInvariant();
+
+    private string GetSelectedListLetter() {
+        var list = _taskLists.FirstOrDefault(l => l.Id == _selectedListId);
+        return list != null ? GetIconLetter(list.Name) : "L";
+    }
+
+    private string GetListTabColorVar() {
+        var list = _taskLists.FirstOrDefault(l => l.Id == _selectedListId);
+        var color = list?.Color ?? "var(--mud-palette-primary)";
+        return $"--list-tab-color: {color};";
+    }
+
+    public void Dispose() {
+        SyncModalRequests.OpenRequested -= OnSyncModalRequested;
+    }
+}

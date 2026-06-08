@@ -3,6 +3,14 @@
 namespace ToDo.RazorLib;
 
 public static class Themes {
+
+    public static (string Primary, string Background) GetColors(MudTheme theme, bool isDark) {
+        if (isDark) {
+            return (theme.PaletteDark.Primary.ToString(), theme.PaletteDark.Background.ToString());
+        }
+        return (theme.PaletteLight.Primary.ToString(), theme.PaletteLight.Background.ToString());
+    }
+
     public static readonly MudTheme OneDarkPro = new() {
         PaletteDark = new PaletteDark {
             // Core brand colors

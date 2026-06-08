@@ -9,6 +9,7 @@
 @inject IDialogService DialogService
 @inject ISettingsService SettingsService
 @inject SyncModalRequestService SyncModalRequests
+@inject ThemeStoreInterop ThemeStore
 @implements IDisposable
 
 <MudThemeProvider @ref="_mudThemeProvider"
@@ -85,14 +86,22 @@
 	}
 
 	protected override async Task OnAfterRenderAsync(bool firstRender) {
-		if (firstRender && _appearance == "System" && _mudThemeProvider != null) {
-			await _mudThemeProvider.WatchSystemDarkModeAsync(OnSystemDarkModeChanged);
-			var systemDarkMode = await _mudThemeProvider.GetSystemDarkModeAsync();
-			if (_isDarkMode != systemDarkMode) {
-				_isDarkMode = systemDarkMode;
-				StateHasChanged();
+		if (firstRender) {
+			if (_appearance == "System" && _mudThemeProvider != null) {
+				await _mudThemeProvider.WatchSystemDarkModeAsync(OnSystemDarkModeChanged);
+				var systemDarkMode = await _mudThemeProvider.GetSystemDarkModeAsync();
+				if (_isDarkMode != systemDarkMode) {
+					_isDarkMode = systemDarkMode;
+					StateHasChanged();
+				}
 			}
+			await PersistThemeAsync();
 		}
+	}
+
+	private async Task PersistThemeAsync() {
+		var (primary, background) = Themes.GetColors(_currentTheme, _isDarkMode);
+		await ThemeStore.PersistAsync(primary, background, _isDarkMode);
 	}
 
 	private void LoadSettings() {
@@ -124,6 +133,7 @@
 	private Task OnSystemDarkModeChanged(bool isDarkMode) {
 		if (_appearance == "System") {
 			_isDarkMode = isDarkMode;
+			_ = PersistThemeAsync();
 			StateHasChanged();
 		}
 		return Task.CompletedTask;
