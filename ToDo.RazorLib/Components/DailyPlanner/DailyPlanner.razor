@@ -1,21 +1,14 @@
 ﻿@inject IDailyPlanService TaskService
 @inject ISettingsService SettingsService
 
-<div class="title">
-	<MudIconButton Icon="@Icons.Material.Filled.NavigateBefore" aria-label="Previous" Color="Color.Primary" Size="Size.Medium" OnClick="GoToPreviousDay" />
-
-	<span class="title-date" onclick="@(async () => { await OnDateSelected(DateTime.Now); })">@Date.ToString("dddd, dd.MM.yyyy")</span>
-	<MudIconButton Icon="@Icons.Material.Filled.NavigateNext" aria-label="Next" Color="Color.Primary" Size="Size.Medium" OnClick="GoToNextDay" />
-
-	<MudMenu Icon="@Icons.Material.Filled.CalendarMonth" Color="Color.Primary" AnchorOrigin="Origin.BottomCenter" TransformOrigin="Origin.TopCenter">
-		<MudDatePicker PickerVariant="PickerVariant.Static"
-							Date="selectedDateTime"
-							DateChanged="OnDateSelected"
-							AutoClose="true"
-							ShowWeekNumbers="true"
-							ShowToolbar="false" />
-	</MudMenu>
-</div>
+<PlannerDateHeader Title="@Date.ToString("dddd, dd.MM.yyyy")"
+					  SelectedDate="selectedDateTime"
+					  PreviousLabel="Previous"
+					  NextLabel="Next"
+					  OnPrevious="GoToPreviousDay"
+					  OnNext="GoToNextDay"
+					  OnToday="GoToToday"
+					  OnDateSelected="OnDateSelected" />
 @foreach (var item in DailyItems) {
 	<DailyItem @key="item.TaskDefinitionId"
 				  Daily="item"
@@ -74,6 +67,10 @@
 	private async Task GoToNextDay() {
 		Date = Date.AddDays(1);
 		await SyncAndReloadAsync();
+	}
+
+	private async Task GoToToday() {
+		await OnDateSelected(DateTime.Now);
 	}
 
 	private async Task OnDateSelected(DateTime? newDate) {

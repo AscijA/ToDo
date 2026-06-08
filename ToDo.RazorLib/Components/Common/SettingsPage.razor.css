@@ -1,0 +1,13 @@
+.settings-page-header {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    width: 100%;
+    min-height: 32px;
+    text-align: left;
+}
+
+.settings-page-header ::deep .mud-icon-button {
+    margin-left: -8px;
+    margin-right: 4px;
+}

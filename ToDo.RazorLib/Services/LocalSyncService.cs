@@ -1,7 +1,12 @@
+using Microsoft.EntityFrameworkCore;
 using System.Security.Cryptography;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using ToDo.Domain.Entities;
+using ToDo.Domain.Entities.Occurrences;
+using ToDo.Domain.Entities.Plans;
+using ToDo.Infrastructure.Data;
 
 namespace ToDo.RazorLib.Services;
 
@@ -11,14 +16,17 @@ public sealed class LocalSyncService : ISyncService {
     private readonly ISettingsService settings;
     private readonly ISyncDiscoveryService discoveryService;
     private readonly ISyncSnapshotService snapshotService;
+    private readonly IDbContextFactory<TodoDbContext> contextFactory;
 
     public LocalSyncService(
         ISettingsService settings,
         ISyncDiscoveryService discoveryService,
-        ISyncSnapshotService snapshotService) {
+        ISyncSnapshotService snapshotService,
+        IDbContextFactory<TodoDbContext> contextFactory) {
         this.settings = settings;
         this.discoveryService = discoveryService;
         this.snapshotService = snapshotService;
+        this.contextFactory = contextFactory;
     }
 
     public SyncDeviceIdentity GetLocalDevice() {
@@ -213,6 +221,144 @@ public sealed class LocalSyncService : ISyncService {
         return CreatePreviewSummary(remoteSnapshot, localSnapshot);
     }
 
+    public async Task<SyncImportSummary> ImportRemoteNewAsync(
+        PairedSyncDevice device,
+        CancellationToken cancellationToken = default) {
+        var remoteSnapshot = await FetchSnapshotAsync(device, cancellationToken);
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+
+        var importCounts = new List<SyncEntityImportCount>();
+
+        var existingTaskDefinitionIds = await context.TaskDefinitions
+            .Select(task => task.Id)
+            .ToHashSetAsync(cancellationToken);
+        var taskDefinitionsToAdd = remoteSnapshot.TaskDefinitions
+            .Where(task => !existingTaskDefinitionIds.Contains(task.Id))
+            .Select(task => new TaskDefinition {
+                Id = task.Id,
+                Title = task.Title,
+                Description = task.Description
+            })
+            .ToList();
+        context.TaskDefinitions.AddRange(taskDefinitionsToAdd);
+        AddImportCount(importCounts, "task definitions", taskDefinitionsToAdd.Count, 0);
+
+        var existingTaskListIds = await context.TaskLists
+            .Select(list => list.Id)
+            .ToHashSetAsync(cancellationToken);
+        var taskListsToAdd = remoteSnapshot.TaskLists
+            .Where(list => !existingTaskListIds.Contains(list.Id))
+            .Select(list => new TaskList {
+                Id = list.Id,
+                Name = list.Name,
+                Color = list.Color,
+                Description = list.Description
+            })
+            .ToList();
+        context.TaskLists.AddRange(taskListsToAdd);
+        AddImportCount(importCounts, "task lists", taskListsToAdd.Count, 0);
+
+        existingTaskDefinitionIds.UnionWith(taskDefinitionsToAdd.Select(task => task.Id));
+        existingTaskListIds.UnionWith(taskListsToAdd.Select(list => list.Id));
+
+        var existingTaskListItemIds = await context.TaskListItems
+            .Select(item => item.Id)
+            .ToHashSetAsync(cancellationToken);
+        var taskListItemsToAdd = remoteSnapshot.TaskListItems
+            .Where(item => !existingTaskListItemIds.Contains(item.Id))
+            .Where(item => existingTaskDefinitionIds.Contains(item.TaskDefinitionId) && existingTaskListIds.Contains(item.TaskListId))
+            .Select(item => new TaskListItem {
+                Id = item.Id,
+                TaskDefinitionId = item.TaskDefinitionId,
+                TaskListId = item.TaskListId,
+                IsDone = item.IsDone,
+                Position = item.Position
+            })
+            .ToList();
+        var skippedTaskListItems = remoteSnapshot.TaskListItems.Count(item =>
+            !existingTaskListItemIds.Contains(item.Id) &&
+            (!existingTaskDefinitionIds.Contains(item.TaskDefinitionId) || !existingTaskListIds.Contains(item.TaskListId)));
+        context.TaskListItems.AddRange(taskListItemsToAdd);
+        AddImportCount(importCounts, "task list items", taskListItemsToAdd.Count, skippedTaskListItems);
+
+        var dailyPlanIdsByDate = await GetPlanIdsByDateAsync(context.DailyPlans, cancellationToken);
+        var weeklyPlanIdsByDate = await GetPlanIdsByDateAsync(context.WeeklyPlans, cancellationToken);
+        var monthlyPlanIdsByDate = await GetPlanIdsByDateAsync(context.MonthlyPlans, cancellationToken);
+
+        AddMissingPlans(context.DailyPlans, dailyPlanIdsByDate, remoteSnapshot.DailyOccurrences.Select(occurrence => (occurrence.Date, occurrence.DailyPlanId)));
+        AddMissingPlans(context.WeeklyPlans, weeklyPlanIdsByDate, remoteSnapshot.WeeklyOccurrences.Select(occurrence => (occurrence.WeekStart, occurrence.WeeklyPlanId)));
+        AddMissingPlans(context.MonthlyPlans, monthlyPlanIdsByDate, remoteSnapshot.MonthlyOccurrences.Select(occurrence => (occurrence.MonthStart, occurrence.MonthlyPlanId)));
+
+        var existingDailyOccurrenceIds = await context.DailyOccurrences
+            .Select(occurrence => occurrence.Id)
+            .ToHashSetAsync(cancellationToken);
+        var dailyOccurrencesToAdd = remoteSnapshot.DailyOccurrences
+            .Where(occurrence => !existingDailyOccurrenceIds.Contains(occurrence.Id))
+            .Where(occurrence => existingTaskDefinitionIds.Contains(occurrence.TaskDefinitionId))
+            .Select(occurrence => new DailyOccurrence {
+                Id = occurrence.Id,
+                TaskDefinitionId = occurrence.TaskDefinitionId,
+                DailyPlanId = dailyPlanIdsByDate[occurrence.Date],
+                IsDone = occurrence.IsDone,
+                Timeslot = occurrence.Timeslot,
+                SortOrder = occurrence.SortOrder
+            })
+            .ToList();
+        var skippedDailyOccurrences = remoteSnapshot.DailyOccurrences.Count(occurrence =>
+            !existingDailyOccurrenceIds.Contains(occurrence.Id) &&
+            !existingTaskDefinitionIds.Contains(occurrence.TaskDefinitionId));
+        context.DailyOccurrences.AddRange(dailyOccurrencesToAdd);
+        AddImportCount(importCounts, "daily planner items", dailyOccurrencesToAdd.Count, skippedDailyOccurrences);
+
+        var existingWeeklyOccurrenceIds = await context.WeeklyOccurrences
+            .Select(occurrence => occurrence.Id)
+            .ToHashSetAsync(cancellationToken);
+        var weeklyOccurrencesToAdd = remoteSnapshot.WeeklyOccurrences
+            .Where(occurrence => !existingWeeklyOccurrenceIds.Contains(occurrence.Id))
+            .Where(occurrence => existingTaskDefinitionIds.Contains(occurrence.TaskDefinitionId))
+            .Select(occurrence => new WeeklyOccurrence {
+                Id = occurrence.Id,
+                TaskDefinitionId = occurrence.TaskDefinitionId,
+                WeeklyPlanId = weeklyPlanIdsByDate[occurrence.WeekStart],
+                IsDone = occurrence.IsDone,
+                DayOfWeek = occurrence.DayOfWeek
+            })
+            .ToList();
+        var skippedWeeklyOccurrences = remoteSnapshot.WeeklyOccurrences.Count(occurrence =>
+            !existingWeeklyOccurrenceIds.Contains(occurrence.Id) &&
+            !existingTaskDefinitionIds.Contains(occurrence.TaskDefinitionId));
+        context.WeeklyOccurrences.AddRange(weeklyOccurrencesToAdd);
+        AddImportCount(importCounts, "weekly planner items", weeklyOccurrencesToAdd.Count, skippedWeeklyOccurrences);
+
+        var existingMonthlyOccurrenceIds = await context.MonthlyOccurrences
+            .Select(occurrence => occurrence.Id)
+            .ToHashSetAsync(cancellationToken);
+        var monthlyOccurrencesToAdd = remoteSnapshot.MonthlyOccurrences
+            .Where(occurrence => !existingMonthlyOccurrenceIds.Contains(occurrence.Id))
+            .Where(occurrence => existingTaskDefinitionIds.Contains(occurrence.TaskDefinitionId))
+            .Select(occurrence => new MonthlyOccurrence {
+                Id = occurrence.Id,
+                TaskDefinitionId = occurrence.TaskDefinitionId,
+                MonthlyPlanId = monthlyPlanIdsByDate[occurrence.MonthStart],
+                IsDone = occurrence.IsDone,
+                DayOfMonth = occurrence.DayOfMonth
+            })
+            .ToList();
+        var skippedMonthlyOccurrences = remoteSnapshot.MonthlyOccurrences.Count(occurrence =>
+            !existingMonthlyOccurrenceIds.Contains(occurrence.Id) &&
+            !existingTaskDefinitionIds.Contains(occurrence.TaskDefinitionId));
+        context.MonthlyOccurrences.AddRange(monthlyOccurrencesToAdd);
+        AddImportCount(importCounts, "monthly planner items", monthlyOccurrencesToAdd.Count, skippedMonthlyOccurrences);
+
+        await context.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        AddOrReplacePairedDevice(device with { LastSyncedAt = DateTimeOffset.Now, IsOnline = true });
+
+        return new SyncImportSummary(remoteSnapshot.DeviceName, importCounts);
+    }
+
     public void RemovePairedDevice(string deviceId) {
         var devices = LoadPairedDevices()
             .Where(device => !string.Equals(device.DeviceId, deviceId, StringComparison.OrdinalIgnoreCase))
@@ -261,6 +407,16 @@ public sealed class LocalSyncService : ISyncService {
     private static SyncPreviewSummary CreatePreviewSummary(
         SyncSnapshotResponse remoteSnapshot,
         SyncSnapshotResponse localSnapshot) {
+        var conflicts = new List<SyncConflictDetail>();
+        var taskNames = remoteSnapshot.TaskDefinitions
+            .Concat(localSnapshot.TaskDefinitions)
+            .GroupBy(task => task.Id)
+            .ToDictionary(group => group.Key, group => group.First().Title);
+        var listNames = remoteSnapshot.TaskLists
+            .Concat(localSnapshot.TaskLists)
+            .GroupBy(list => list.Id)
+            .ToDictionary(group => group.Key, group => group.First().Name);
+
         return new SyncPreviewSummary(
             remoteSnapshot.DeviceName,
             remoteSnapshot.CreatedAt,
@@ -269,40 +425,69 @@ public sealed class LocalSyncService : ISyncService {
                     "task definitions",
                     remoteSnapshot.TaskDefinitions,
                     localSnapshot.TaskDefinitions,
-                    snapshot => snapshot.Id),
+                    snapshot => snapshot.Id,
+                    conflicts,
+                    CreateTaskDefinitionConflict),
                 CompareEntities(
                     "task lists",
                     remoteSnapshot.TaskLists,
                     localSnapshot.TaskLists,
-                    snapshot => snapshot.Id),
+                    snapshot => snapshot.Id,
+                    conflicts,
+                    CreateTaskListConflict),
                 CompareEntities(
                     "task list items",
                     remoteSnapshot.TaskListItems,
                     localSnapshot.TaskListItems,
-                    snapshot => snapshot.Id),
+                    snapshot => snapshot.Id,
+                    conflicts,
+                    (remote, local) => CreateTaskListItemConflict(remote, local, taskNames, listNames)),
                 CompareEntities(
                     "daily planner items",
                     remoteSnapshot.DailyOccurrences,
                     localSnapshot.DailyOccurrences,
-                    snapshot => snapshot.Id),
+                    snapshot => snapshot.Id,
+                    conflicts,
+                    (remote, local) => CreateDailyOccurrenceConflict(remote, local, taskNames),
+                    (remote, local) => remote.TaskDefinitionId == local.TaskDefinitionId
+                        && remote.Date == local.Date
+                        && remote.IsDone == local.IsDone
+                        && string.Equals(remote.Timeslot, local.Timeslot, StringComparison.Ordinal)
+                        && remote.SortOrder == local.SortOrder),
                 CompareEntities(
                     "weekly planner items",
                     remoteSnapshot.WeeklyOccurrences,
                     localSnapshot.WeeklyOccurrences,
-                    snapshot => snapshot.Id),
+                    snapshot => snapshot.Id,
+                    conflicts,
+                    (remote, local) => CreateWeeklyOccurrenceConflict(remote, local, taskNames),
+                    (remote, local) => remote.TaskDefinitionId == local.TaskDefinitionId
+                        && remote.WeekStart == local.WeekStart
+                        && remote.IsDone == local.IsDone
+                        && remote.DayOfWeek == local.DayOfWeek),
                 CompareEntities(
                     "monthly planner items",
                     remoteSnapshot.MonthlyOccurrences,
                     localSnapshot.MonthlyOccurrences,
-                    snapshot => snapshot.Id)
-            ]);
+                    snapshot => snapshot.Id,
+                    conflicts,
+                    (remote, local) => CreateMonthlyOccurrenceConflict(remote, local, taskNames),
+                    (remote, local) => remote.TaskDefinitionId == local.TaskDefinitionId
+                        && remote.MonthStart == local.MonthStart
+                        && remote.IsDone == local.IsDone
+                        && remote.DayOfMonth == local.DayOfMonth)
+            ],
+            conflicts);
     }
 
     private static SyncEntityPreviewCount CompareEntities<T>(
         string name,
         IReadOnlyList<T> remoteItems,
         IReadOnlyList<T> localItems,
-        Func<T, Guid> getId) {
+        Func<T, Guid> getId,
+        ICollection<SyncConflictDetail> conflicts,
+        Func<T, T, SyncConflictDetail> createConflict,
+        Func<T, T, bool>? areEqual = null) {
         var localById = localItems.ToDictionary(getId);
         var remoteIds = remoteItems.Select(getId).ToHashSet();
         var newCount = 0;
@@ -316,16 +501,176 @@ public sealed class LocalSyncService : ISyncService {
                 continue;
             }
 
-            if (EqualityComparer<T>.Default.Equals(remoteItem, localItem)) {
+            if ((areEqual ?? EqualityComparer<T>.Default.Equals)(remoteItem, localItem)) {
                 matchingCount++;
             }
             else {
                 changedCount++;
+                conflicts.Add(createConflict(remoteItem, localItem));
             }
         }
 
         var localOnlyCount = localItems.Count(localItem => !remoteIds.Contains(getId(localItem)));
         return new SyncEntityPreviewCount(name, newCount, matchingCount, changedCount, localOnlyCount);
+    }
+
+    private static SyncConflictDetail CreateTaskDefinitionConflict(
+        SyncTaskDefinitionSnapshot remote,
+        SyncTaskDefinitionSnapshot local) {
+        return new SyncConflictDetail(
+            "task definitions",
+            remote.Id,
+            FirstNonEmpty(remote.Title, local.Title, remote.Id.ToString("N")),
+            [
+                .. FieldIfChanged("title", local.Title, remote.Title),
+                .. FieldIfChanged("description", local.Description, remote.Description)
+            ]);
+    }
+
+    private static SyncConflictDetail CreateTaskListConflict(
+        SyncTaskListSnapshot remote,
+        SyncTaskListSnapshot local) {
+        return new SyncConflictDetail(
+            "task lists",
+            remote.Id,
+            FirstNonEmpty(remote.Name, local.Name, remote.Id.ToString("N")),
+            [
+                .. FieldIfChanged("name", local.Name, remote.Name),
+                .. FieldIfChanged("color", local.Color, remote.Color),
+                .. FieldIfChanged("description", local.Description, remote.Description)
+            ]);
+    }
+
+    private static SyncConflictDetail CreateTaskListItemConflict(
+        SyncTaskListItemSnapshot remote,
+        SyncTaskListItemSnapshot local,
+        IReadOnlyDictionary<Guid, string> taskNames,
+        IReadOnlyDictionary<Guid, string> listNames) {
+        return new SyncConflictDetail(
+            "task list items",
+            remote.Id,
+            $"{GetName(taskNames, remote.TaskDefinitionId)} in {GetName(listNames, remote.TaskListId)}",
+            [
+                .. FieldIfChanged("task", GetName(taskNames, local.TaskDefinitionId), GetName(taskNames, remote.TaskDefinitionId)),
+                .. FieldIfChanged("list", GetName(listNames, local.TaskListId), GetName(listNames, remote.TaskListId)),
+                .. FieldIfChanged("done", local.IsDone, remote.IsDone),
+                .. FieldIfChanged("position", local.Position, remote.Position)
+            ]);
+    }
+
+    private static SyncConflictDetail CreateDailyOccurrenceConflict(
+        SyncDailyOccurrenceSnapshot remote,
+        SyncDailyOccurrenceSnapshot local,
+        IReadOnlyDictionary<Guid, string> taskNames) {
+        return new SyncConflictDetail(
+            "daily planner items",
+            remote.Id,
+            $"{GetName(taskNames, remote.TaskDefinitionId)} on {remote.Date}",
+            [
+                .. FieldIfChanged("task", GetName(taskNames, local.TaskDefinitionId), GetName(taskNames, remote.TaskDefinitionId)),
+                .. FieldIfChanged("date", local.Date, remote.Date),
+                .. FieldIfChanged("done", local.IsDone, remote.IsDone),
+                .. FieldIfChanged("timeslot", local.Timeslot, remote.Timeslot),
+                .. FieldIfChanged("sort order", local.SortOrder, remote.SortOrder)
+            ]);
+    }
+
+    private static SyncConflictDetail CreateWeeklyOccurrenceConflict(
+        SyncWeeklyOccurrenceSnapshot remote,
+        SyncWeeklyOccurrenceSnapshot local,
+        IReadOnlyDictionary<Guid, string> taskNames) {
+        return new SyncConflictDetail(
+            "weekly planner items",
+            remote.Id,
+            $"{GetName(taskNames, remote.TaskDefinitionId)} in week {remote.WeekStart}",
+            [
+                .. FieldIfChanged("task", GetName(taskNames, local.TaskDefinitionId), GetName(taskNames, remote.TaskDefinitionId)),
+                .. FieldIfChanged("week", local.WeekStart, remote.WeekStart),
+                .. FieldIfChanged("done", local.IsDone, remote.IsDone),
+                .. FieldIfChanged("day", local.DayOfWeek, remote.DayOfWeek)
+            ]);
+    }
+
+    private static SyncConflictDetail CreateMonthlyOccurrenceConflict(
+        SyncMonthlyOccurrenceSnapshot remote,
+        SyncMonthlyOccurrenceSnapshot local,
+        IReadOnlyDictionary<Guid, string> taskNames) {
+        return new SyncConflictDetail(
+            "monthly planner items",
+            remote.Id,
+            $"{GetName(taskNames, remote.TaskDefinitionId)} in month {remote.MonthStart}",
+            [
+                .. FieldIfChanged("task", GetName(taskNames, local.TaskDefinitionId), GetName(taskNames, remote.TaskDefinitionId)),
+                .. FieldIfChanged("month", local.MonthStart, remote.MonthStart),
+                .. FieldIfChanged("done", local.IsDone, remote.IsDone),
+                .. FieldIfChanged("day", local.DayOfMonth, remote.DayOfMonth)
+            ]);
+    }
+
+    private static IReadOnlyList<SyncFieldConflict> FieldIfChanged<T>(
+        string name,
+        T localValue,
+        T remoteValue) {
+        if (EqualityComparer<T>.Default.Equals(localValue, remoteValue)) {
+            return Array.Empty<SyncFieldConflict>();
+        }
+
+        return [new SyncFieldConflict(name, FormatValue(localValue), FormatValue(remoteValue))];
+    }
+
+    private static string GetName(IReadOnlyDictionary<Guid, string> names, Guid id) {
+        return names.TryGetValue(id, out var name) && !string.IsNullOrWhiteSpace(name)
+            ? name
+            : id.ToString("N");
+    }
+
+    private static string FirstNonEmpty(params string[] values) {
+        return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty;
+    }
+
+    private static string FormatValue<T>(T value) {
+        return value switch {
+            null => "(empty)",
+            string text when string.IsNullOrWhiteSpace(text) => "(empty)",
+            DateOnly date => date.ToString("yyyy-MM-dd"),
+            bool boolean => boolean ? "yes" : "no",
+            _ => value?.ToString() ?? "(empty)"
+        };
+    }
+
+    private static async Task<Dictionary<DateOnly, Guid>> GetPlanIdsByDateAsync<TPlan>(
+        DbSet<TPlan> plans,
+        CancellationToken cancellationToken)
+        where TPlan : PlanBase {
+        return await plans
+            .Select(plan => new { plan.Date, plan.Id })
+            .ToDictionaryAsync(plan => plan.Date, plan => plan.Id, cancellationToken);
+    }
+
+    private static void AddMissingPlans<TPlan>(
+        DbSet<TPlan> plans,
+        IDictionary<DateOnly, Guid> planIdsByDate,
+        IEnumerable<(DateOnly Date, Guid PlanId)> remotePlans)
+        where TPlan : PlanBase, new() {
+        foreach (var remotePlan in remotePlans.DistinctBy(plan => plan.Date)) {
+            if (planIdsByDate.ContainsKey(remotePlan.Date)) {
+                continue;
+            }
+
+            plans.Add(new TPlan {
+                Id = remotePlan.PlanId,
+                Date = remotePlan.Date
+            });
+            planIdsByDate[remotePlan.Date] = remotePlan.PlanId;
+        }
+    }
+
+    private static void AddImportCount(
+        ICollection<SyncEntityImportCount> importCounts,
+        string name,
+        int importedCount,
+        int skippedCount) {
+        importCounts.Add(new SyncEntityImportCount(name, importedCount, skippedCount));
     }
 
     private static HttpClient CreatePairingClient() {

@@ -10,9 +10,11 @@ namespace ToDo.Application.Services;
 
 public class WeeklyOccurrenceService : IWeeklyOccurrenceService {
     private readonly IDbContextFactory<TodoDbContext> _contextFactory;
+    private readonly IDataChangeNotifier _dataChangeNotifier;
 
-    public WeeklyOccurrenceService(IDbContextFactory<TodoDbContext> contextFactory) {
+    public WeeklyOccurrenceService(IDbContextFactory<TodoDbContext> contextFactory, IDataChangeNotifier dataChangeNotifier) {
         _contextFactory = contextFactory;
+        _dataChangeNotifier = dataChangeNotifier;
     }
 
     public async Task<WeeklyItemDTO> GetByIdAsync(Guid occurenceId) {
@@ -52,6 +54,7 @@ public class WeeklyOccurrenceService : IWeeklyOccurrenceService {
         await SyncTaskCompletionStatus(context, weeklyItem.TaskDefinitionId, dto.IsDone);
 
         await context.SaveChangesAsync();
+        _dataChangeNotifier.NotifyChanged();
 
         var color = await context.TaskListItems
             .Where(i => i.TaskDefinitionId == weeklyItem.TaskDefinitionId)
@@ -68,6 +71,7 @@ public class WeeklyOccurrenceService : IWeeklyOccurrenceService {
             weeklyItem.IsDone = !weeklyItem.IsDone;
             await SyncTaskCompletionStatus(context, weeklyItem.TaskDefinitionId, weeklyItem.IsDone);
             await context.SaveChangesAsync();
+            _dataChangeNotifier.NotifyChanged();
         }
     }
 
@@ -91,6 +95,7 @@ public class WeeklyOccurrenceService : IWeeklyOccurrenceService {
         if (weeklyItem != null) {
             context.WeeklyOccurrences.Remove(weeklyItem);
             await context.SaveChangesAsync();
+            _dataChangeNotifier.NotifyChanged();
         }
     }
 

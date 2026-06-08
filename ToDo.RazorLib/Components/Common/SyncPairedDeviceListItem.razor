@@ -1,0 +1,36 @@
+@using ToDo.RazorLib.Services
+@inject IDialogService DialogService
+
+<MudListItem Value="@Device">
+	<div class="d-flex align-center mud-width-full">
+		<MudStack Spacing="0">
+			<MudText Typo="Typo.body2">@Device.DeviceName</MudText>
+			<MudText Typo="Typo.caption" Color="@(Device.IsOnline ? Color.Success : Color.Secondary)">
+				@(Device.IsOnline ? "Online" : "Offline") - @Device.Address
+			</MudText>
+		</MudStack>
+		<MudSpacer />
+		<MudIconButton Icon="@Icons.Material.Filled.MoreVert"
+					   aria-label="Open paired device actions"
+					   Size="Size.Small"
+					   Color="Color.Primary"
+					   OnClick="OpenActionsAsync" />
+	</div>
+</MudListItem>
+
+@code {
+	[Parameter, EditorRequired]
+	public PairedSyncDevice Device { get; set; } = null!;
+
+	[Parameter]
+	public EventCallback OnDevicesChanged { get; set; }
+
+	private async Task OpenActionsAsync() {
+		var parameters = new DialogParameters {
+			[nameof(SyncPairedDeviceActionsDialog.Device)] = Device,
+			[nameof(SyncPairedDeviceActionsDialog.OnDevicesChanged)] = OnDevicesChanged
+		};
+
+		await DialogService.ShowAsync<SyncPairedDeviceActionsDialog>("Device Actions", parameters);
+	}
+}

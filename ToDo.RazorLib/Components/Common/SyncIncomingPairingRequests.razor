@@ -1,0 +1,36 @@
+@if (Requests.Count > 0) {
+	<MudText Typo="Typo.subtitle1">Incoming pairing requests</MudText>
+	@foreach (var request in Requests) {
+		<MudPaper Class="pa-3" Elevation="0" Outlined="true">
+			<MudStack Spacing="2">
+				<MudText Typo="Typo.subtitle2">@request.DeviceName wants to pair</MudText>
+				<MudText Typo="Typo.caption" Color="Color.Secondary">@request.Address</MudText>
+				<MudText Typo="Typo.body2">Confirm this code matches on the other device.</MudText>
+				<MudText Typo="Typo.h5" Align="Align.Center">@request.VerificationCode</MudText>
+				@if (request.IsApproved) {
+					<MudText Typo="Typo.caption" Color="Color.Success">Approved. Waiting for the other device to confirm.</MudText>
+				}
+				<div class="d-flex justify-end gap-2">
+					<MudButton Size="Size.Small" OnClick="@(() => OnReject.InvokeAsync(request.SessionId))">Reject</MudButton>
+					<MudButton Size="Size.Small"
+								  Color="Color.Primary"
+								  Disabled="@request.IsApproved"
+								  OnClick="@(() => OnApprove.InvokeAsync(request.SessionId))">
+						Approve
+					</MudButton>
+				</div>
+			</MudStack>
+		</MudPaper>
+	}
+}
+
+@code {
+	[Parameter]
+	public IReadOnlyList<IncomingPairingRequest> Requests { get; set; } = Array.Empty<IncomingPairingRequest>();
+
+	[Parameter]
+	public EventCallback<string> OnApprove { get; set; }
+
+	[Parameter]
+	public EventCallback<string> OnReject { get; set; }
+}

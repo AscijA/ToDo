@@ -1,0 +1,56 @@
+@using ToDo.RazorLib.Components.TaskList
+
+@if (SelectedListId != Guid.Empty) {
+    <TaskList ListId="SelectedListId"
+              OnDeleted="OnListDeleted"
+              OnUpdated="OnListsUpdated" />
+}
+else {
+    <div class="mobile-list-picker">
+        <MudText Typo="Typo.h6" Class="mb-3">Task Lists</MudText>
+        @foreach (var list in TaskLists) {
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Primary"
+                       FullWidth="true"
+                       Class="mb-2 justify-start"
+                       OnClick="() => OnListSelected.InvokeAsync(list.Id)">
+                <MudAvatar Size="Size.Small"
+                           Style="@($"background-color: {list.Color}; color: white;")">
+                    @GetIconLetter(list.Name)
+                </MudAvatar>
+                <MudText Class="ml-2">@list.Name</MudText>
+            </MudButton>
+        }
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   FullWidth="true"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OnAddNewList"
+                   Class="mt-3">
+            New List
+        </MudButton>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public IReadOnlyList<TaskListDto> TaskLists { get; set; } = Array.Empty<TaskListDto>();
+
+    [Parameter]
+    public Guid SelectedListId { get; set; }
+
+    [Parameter]
+    public EventCallback<Guid> OnListSelected { get; set; }
+
+    [Parameter]
+    public EventCallback OnAddNewList { get; set; }
+
+    [Parameter]
+    public EventCallback OnListDeleted { get; set; }
+
+    [Parameter]
+    public EventCallback OnListsUpdated { get; set; }
+
+    private static string GetIconLetter(string name) =>
+        string.IsNullOrWhiteSpace(name) ? "?" : name.Trim()[0].ToString().ToUpperInvariant();
+}

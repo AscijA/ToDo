@@ -8,9 +8,11 @@ namespace ToDo.Application.Services;
 
 public class DailyOccurrenceService : IDailyOccurrenceService {
     private readonly IDbContextFactory<TodoDbContext> _contextFactory;
+    private readonly IDataChangeNotifier _dataChangeNotifier;
 
-    public DailyOccurrenceService(IDbContextFactory<TodoDbContext> contextFactory) {
+    public DailyOccurrenceService(IDbContextFactory<TodoDbContext> contextFactory, IDataChangeNotifier dataChangeNotifier) {
         _contextFactory = contextFactory;
+        _dataChangeNotifier = dataChangeNotifier;
     }
 
     public async Task<DailyItemDTO> GetByIdAsync(Guid id) {
@@ -47,6 +49,7 @@ public class DailyOccurrenceService : IDailyOccurrenceService {
         await SyncTaskCompletionStatus(context, dailyItem.TaskDefinitionId, dto.IsDone);
 
         await context.SaveChangesAsync();
+        _dataChangeNotifier.NotifyChanged();
         
         var color = await context.TaskListItems
             .Where(i => i.TaskDefinitionId == dailyItem.TaskDefinitionId)
@@ -64,6 +67,7 @@ public class DailyOccurrenceService : IDailyOccurrenceService {
             dailyItem.IsDone = !dailyItem.IsDone;
             await SyncTaskCompletionStatus(context, dailyItem.TaskDefinitionId, dailyItem.IsDone);
             await context.SaveChangesAsync();
+            _dataChangeNotifier.NotifyChanged();
         }
     }
 
@@ -90,6 +94,7 @@ public class DailyOccurrenceService : IDailyOccurrenceService {
         if (dailyItem != null) {
             context.DailyOccurrences.Remove(dailyItem);
             await context.SaveChangesAsync();
+            _dataChangeNotifier.NotifyChanged();
         }
     }
 }

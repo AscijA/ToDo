@@ -1,0 +1,56 @@
+<div class="title">
+	<MudIconButton Icon="@Icons.Material.Filled.NavigateBefore"
+					  aria-label="@PreviousLabel"
+					  Color="Color.Primary"
+					  Size="Size.Medium"
+					  OnClick="OnPrevious" />
+
+	<span class="title-date" @onclick="OnToday">@Title</span>
+
+	<MudIconButton Icon="@Icons.Material.Filled.NavigateNext"
+					  aria-label="@NextLabel"
+					  Color="Color.Primary"
+					  Size="Size.Medium"
+					  OnClick="OnNext" />
+
+	<MudMenu Icon="@Icons.Material.Filled.CalendarMonth"
+				Color="Color.Primary"
+				AnchorOrigin="Origin.BottomCenter"
+				TransformOrigin="Origin.TopCenter">
+		<MudDatePicker PickerVariant="PickerVariant.Static"
+							Date="SelectedDate"
+							DateChanged="OnDateSelected"
+							AutoClose="true"
+							ShowWeekNumbers="ShowWeekNumbers"
+							ShowToolbar="false" />
+	</MudMenu>
+</div>
+
+@code {
+	[Parameter]
+	public string Title { get; set; } = string.Empty;
+
+	[Parameter]
+	public DateTime SelectedDate { get; set; }
+
+	[Parameter]
+	public bool ShowWeekNumbers { get; set; } = true;
+
+	[Parameter]
+	public string PreviousLabel { get; set; } = "Previous";
+
+	[Parameter]
+	public string NextLabel { get; set; } = "Next";
+
+	[Parameter]
+	public EventCallback OnPrevious { get; set; }
+
+	[Parameter]
+	public EventCallback OnNext { get; set; }
+
+	[Parameter]
+	public EventCallback OnToday { get; set; }
+
+	[Parameter]
+	public EventCallback<DateTime?> OnDateSelected { get; set; }
+}

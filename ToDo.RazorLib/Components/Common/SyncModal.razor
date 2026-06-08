@@ -156,71 +156,12 @@
 					else {
 						<MudList T="PairedSyncDevice" Dense="true">
 							@foreach (var device in _pairedDevices) {
-								<MudListItem Value="@device">
-									<div class="d-flex align-center mud-width-full">
-										<MudStack Spacing="0">
-											<MudText Typo="Typo.body2">@device.DeviceName</MudText>
-											<MudText Typo="Typo.caption" Color="@(device.IsOnline ? Color.Success : Color.Secondary)">
-												@(device.IsOnline ? "Online" : "Offline") - @device.Address
-											</MudText>
-										</MudStack>
-										<MudSpacer />
-										<MudButton Size="Size.Small"
-													 Color="Color.Primary"
-													 Variant="Variant.Text"
-													 Disabled="@(_pingingDeviceId == device.DeviceId)"
-													 OnClick="@(() => PingPairedDevice(device))">
-											@if (_pingingDeviceId == device.DeviceId) {
-												<MudProgressCircular Size="Size.Small" Indeterminate="true" />
-											}
-											else {
-												<span>Ping</span>
-											}
-										</MudButton>
-										<MudButton Size="Size.Small"
-													 Color="Color.Primary"
-													 Variant="Variant.Text"
-													 Disabled="@(_snapshotDeviceId == device.DeviceId)"
-													 OnClick="@(() => FetchSnapshot(device))">
-											@if (_snapshotDeviceId == device.DeviceId) {
-												<MudProgressCircular Size="Size.Small" Indeterminate="true" />
-											}
-											else {
-												<span>Snapshot</span>
-											}
-										</MudButton>
-										<MudButton Size="Size.Small"
-													 Color="Color.Primary"
-													 Variant="Variant.Text"
-													 Disabled="@(_previewDeviceId == device.DeviceId)"
-													 OnClick="@(() => PreviewSync(device))">
-											@if (_previewDeviceId == device.DeviceId) {
-												<MudProgressCircular Size="Size.Small" Indeterminate="true" />
-											}
-											else {
-												<span>Preview</span>
-											}
-										</MudButton>
-										<MudIconButton Icon="@Icons.Material.Filled.Delete"
-															aria-label="Remove paired device"
-															Size="Size.Small"
-															Color="Color.Error"
-															OnClick="@(() => RemovePairedDevice(device.DeviceId))" />
-									</div>
-								</MudListItem>
+								<SyncPairedDeviceListItem Device="@device"
+															  OnDevicesChanged="RefreshPairedDevicesAsync" />
 							}
 						</MudList>
 					}
 				</MudPaper>
-				@if (!string.IsNullOrWhiteSpace(_pingMessage)) {
-					<MudAlert Severity="@_pingSeverity" Dense="true">@_pingMessage</MudAlert>
-				}
-				@if (!string.IsNullOrWhiteSpace(_snapshotMessage)) {
-					<MudAlert Severity="@_snapshotSeverity" Dense="true">@_snapshotMessage</MudAlert>
-				}
-				@if (!string.IsNullOrWhiteSpace(_previewMessage)) {
-					<MudAlert Severity="@_previewSeverity" Dense="true">@_previewMessage</MudAlert>
-				}
 			</MudStack>
 		</div>
 	</DialogContent>
@@ -246,15 +187,6 @@
 	private string _pairingCodeConfirmation = string.Empty;
 	private string? _discoveryMessage;
 	private string? _pairingMessage;
-	private string? _pingMessage;
-	private Severity _pingSeverity = Severity.Info;
-	private string? _pingingDeviceId;
-	private string? _snapshotMessage;
-	private Severity _snapshotSeverity = Severity.Info;
-	private string? _snapshotDeviceId;
-	private string? _previewMessage;
-	private Severity _previewSeverity = Severity.Info;
-	private string? _previewDeviceId;
 	private PeriodicTimer? _incomingPairingTimer;
 	private CancellationTokenSource? _incomingPairingTimerCancellation;
 	private bool _isDiscovering;
@@ -318,7 +250,7 @@
 		try {
 			var discovery = await SyncService.DiscoverAvailableDevicesAsync();
 			_availableDevices = discovery.Devices;
-			_discoveryMessage = discovery.Message;
+			_discoveryMessage = SyncUserMessages.Discovery(discovery.Message);
 		}
 		finally {
 			_isDiscovering = false;
@@ -361,7 +293,7 @@
 			_pairingSession = await SyncService.StartPairingAsync(device, localAddress);
 		}
 		catch (Exception ex) {
-			_pairingMessage = ex.Message;
+			_pairingMessage = SyncUserMessages.Explain(ex);
 			_isPairingBusy = false;
 			return;
 		}
@@ -394,7 +326,7 @@
 			paired = await SyncService.ConfirmPairingAsync(_pairingSession, GetLocalSyncAddress());
 		}
 		catch (Exception ex) {
-			_pairingMessage = ex.Message;
+			_pairingMessage = SyncUserMessages.Explain(ex);
 			_isPairingBusy = false;
 			return;
 		}
@@ -412,68 +344,6 @@
 		_pairedDevices = SyncService.GetPairedDevices();
 		await RefreshAvailableDevicesAsync();
 		StateHasChanged();
-	}
-
-	private async Task RemovePairedDevice(string deviceId) {
-		SyncService.RemovePairedDevice(deviceId);
-		_pairedDevices = SyncService.GetPairedDevices();
-		await RefreshAvailableDevicesAsync();
-	}
-
-	private async Task PingPairedDevice(PairedSyncDevice device) {
-		_pingMessage = null;
-		_pingingDeviceId = device.DeviceId;
-
-		try {
-			var updatedDevice = await SyncService.PingPairedDeviceAsync(device);
-			_pairedDevices = SyncService.GetPairedDevices();
-			_pingSeverity = Severity.Success;
-			_pingMessage = $"{updatedDevice.DeviceName} responded.";
-		}
-		catch (Exception ex) {
-			_pairedDevices = SyncService.GetPairedDevices();
-			_pingSeverity = Severity.Warning;
-			_pingMessage = ex.Message;
-		}
-		finally {
-			_pingingDeviceId = null;
-		}
-	}
-
-	private async Task FetchSnapshot(PairedSyncDevice device) {
-		_snapshotMessage = null;
-		_snapshotDeviceId = device.DeviceId;
-
-		try {
-			var snapshot = await SyncService.FetchSnapshotAsync(device);
-			_snapshotSeverity = Severity.Success;
-			_snapshotMessage = $"{snapshot.DeviceName} snapshot: {snapshot.TaskLists.Count} lists, {snapshot.TaskListItems.Count} list items, {snapshot.DailyOccurrences.Count + snapshot.WeeklyOccurrences.Count + snapshot.MonthlyOccurrences.Count} planner items.";
-		}
-		catch (Exception ex) {
-			_snapshotSeverity = Severity.Warning;
-			_snapshotMessage = ex.Message;
-		}
-		finally {
-			_snapshotDeviceId = null;
-		}
-	}
-
-	private async Task PreviewSync(PairedSyncDevice device) {
-		_previewMessage = null;
-		_previewDeviceId = device.DeviceId;
-
-		try {
-			var preview = await SyncService.PreviewSyncAsync(device);
-			_previewSeverity = preview.ChangedCount == 0 ? Severity.Success : Severity.Warning;
-			_previewMessage = FormatPreviewMessage(preview);
-		}
-		catch (Exception ex) {
-			_previewSeverity = Severity.Warning;
-			_previewMessage = ex.Message;
-		}
-		finally {
-			_previewDeviceId = null;
-		}
 	}
 
 	private void ApproveIncomingPairing(string sessionId) {
@@ -526,19 +396,6 @@
 		return new string(code.Where(char.IsDigit).ToArray());
 	}
 
-	private static string FormatPreviewMessage(SyncPreviewSummary preview) {
-		var changedDetails = preview.EntityCounts
-			.Where(count => count.NewCount > 0 || count.ChangedCount > 0 || count.LocalOnlyCount > 0)
-			.Select(count => $"{count.Name}: +{count.NewCount}, changed {count.ChangedCount}, local-only {count.LocalOnlyCount}");
-
-		var details = string.Join("; ", changedDetails);
-		if (string.IsNullOrWhiteSpace(details)) {
-			details = "no remote changes found";
-		}
-
-		return $"{preview.DeviceName} preview: {preview.NewCount} new, {preview.MatchingCount} matching, {preview.ChangedCount} changed, {preview.LocalOnlyCount} local-only. {details}.";
-	}
-
 	private string GetDiscoveryMessage() {
 		if (!string.IsNullOrWhiteSpace(_discoveryMessage)) {
 			return _discoveryMessage;
@@ -553,6 +410,12 @@
 		return _transportStatus is { IsRunning: true, Address: not null, Port: not null }
 			? $"{_transportStatus.Address}:{_transportStatus.Port}"
 			: string.Empty;
+	}
+
+	private async Task RefreshPairedDevicesAsync() {
+		_pairedDevices = SyncService.GetPairedDevices();
+		await RefreshAvailableDevicesAsync();
+		StateHasChanged();
 	}
 
 	public void Dispose() {

@@ -8,9 +8,11 @@ namespace ToDo.Application.Services;
 
 public class TaskListService : ITaskListService {
     private readonly IDbContextFactory<TodoDbContext> _contextFactory;
+    private readonly IDataChangeNotifier _dataChangeNotifier;
 
-    public TaskListService(IDbContextFactory<TodoDbContext> contextFactory) {
+    public TaskListService(IDbContextFactory<TodoDbContext> contextFactory, IDataChangeNotifier dataChangeNotifier) {
         _contextFactory = contextFactory;
+        _dataChangeNotifier = dataChangeNotifier;
     }
 
     public async Task<List<TaskListDto>> GetAllAsync() {
@@ -49,6 +51,7 @@ public class TaskListService : ITaskListService {
         var l = new TaskList { Name = name, Color = color, Description = description };
         ctx.TaskLists.Add(l);
         await ctx.SaveChangesAsync();
+        _dataChangeNotifier.NotifyChanged();
         return new TaskListDto(l.Id, l.Name, l.Color, l.Description, new List<TaskListItemDto>());
     }
 
@@ -60,6 +63,7 @@ public class TaskListService : ITaskListService {
         l.Color = color;
         l.Description = description;
         await ctx.SaveChangesAsync();
+        _dataChangeNotifier.NotifyChanged();
     }
 
     public async Task DeleteAsync(Guid id) {
@@ -68,6 +72,7 @@ public class TaskListService : ITaskListService {
         if (l == null) return;
         ctx.TaskLists.Remove(l);
         await ctx.SaveChangesAsync();
+        _dataChangeNotifier.NotifyChanged();
     }
 
     public async Task<TaskListItemDto> AddItemAsync(Guid listId, string text) {
@@ -84,6 +89,7 @@ public class TaskListService : ITaskListService {
         var li = new TaskListItem { TaskDefinition = taskDef, TaskListId = listId, Position = maxPosition + 1 };
         ctx.TaskListItems.Add(li);
         await ctx.SaveChangesAsync();
+        _dataChangeNotifier.NotifyChanged();
         return new TaskListItemDto(li.Id, taskDef.Id, taskDef.Title, li.IsDone, li.Position);
     }
 
@@ -109,6 +115,7 @@ public class TaskListService : ITaskListService {
         foreach (var o in monthly) o.IsDone = isDone;
 
         await ctx.SaveChangesAsync();
+        _dataChangeNotifier.NotifyChanged();
     }
 
     public async Task DeleteItemAsync(Guid itemId) {
@@ -117,6 +124,7 @@ public class TaskListService : ITaskListService {
         if (it == null) return;
         ctx.TaskListItems.Remove(it);
         await ctx.SaveChangesAsync();
+        _dataChangeNotifier.NotifyChanged();
     }
 
     public async Task UpdateOrderAsync(Guid listId, List<Guid> itemIds) {
@@ -131,5 +139,6 @@ public class TaskListService : ITaskListService {
         }
 
         await ctx.SaveChangesAsync();
+        _dataChangeNotifier.NotifyChanged();
     }
 }

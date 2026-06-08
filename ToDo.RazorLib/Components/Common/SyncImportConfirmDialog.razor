@@ -1,0 +1,81 @@
+@using ToDo.RazorLib.Services
+
+<MudDialog>
+	<DialogContent>
+		<div @onkeydown="HandleKeyDown">
+			<MudStack Spacing="3">
+				<MudText Typo="Typo.body2">
+					Import remote-new items from @Preview.DeviceName. Existing, changed, and local-only items will not be overwritten or deleted.
+				</MudText>
+
+				<MudPaper Class="pa-3" Elevation="0" Outlined="true">
+					<MudStack Spacing="1">
+						<MudText Typo="Typo.body2">
+							@Preview.NewCount new, @Preview.MatchingCount matching, @Preview.ChangedCount changed, @Preview.LocalOnlyCount local-only
+						</MudText>
+						@foreach (var count in Preview.EntityCounts.Where(count => count.NewCount > 0 || count.ChangedCount > 0 || count.LocalOnlyCount > 0)) {
+							<MudText Typo="Typo.caption" Color="Color.Secondary">
+								@count.Name: +@count.NewCount, changed @count.ChangedCount, local-only @count.LocalOnlyCount
+							</MudText>
+						}
+					</MudStack>
+				</MudPaper>
+
+				@if (Preview.ChangedCount > 0) {
+					<MudAlert Severity="Severity.Warning" Dense="true">
+						Changed items are conflicts and will be skipped for now.
+					</MudAlert>
+
+					<MudStack Spacing="2">
+						<MudText Typo="Typo.subtitle2">Conflicts</MudText>
+						@foreach (var conflict in Preview.Conflicts.Take(20)) {
+							<MudPaper Class="pa-3" Elevation="0" Outlined="true">
+								<MudStack Spacing="1">
+									<MudText Typo="Typo.body2">@conflict.Label</MudText>
+									<MudText Typo="Typo.caption" Color="Color.Secondary">@conflict.EntityName</MudText>
+									@foreach (var field in conflict.Fields) {
+										<MudText Typo="Typo.caption">
+											@field.Name: local @field.LocalValue, remote @field.RemoteValue
+										</MudText>
+									}
+								</MudStack>
+							</MudPaper>
+						}
+						@if (Preview.Conflicts.Count > 20) {
+							<MudText Typo="Typo.caption" Color="Color.Secondary">
+								Showing 20 of @Preview.Conflicts.Count conflicts.
+							</MudText>
+						}
+					</MudStack>
+				}
+			</MudStack>
+		</div>
+	</DialogContent>
+	<DialogActions>
+		<MudButton OnClick="Cancel">Cancel</MudButton>
+		<MudButton Color="Color.Primary" OnClick="Confirm">Import New</MudButton>
+	</DialogActions>
+</MudDialog>
+
+@code {
+	[CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+	[Parameter, EditorRequired]
+	public SyncPreviewSummary Preview { get; set; } = null!;
+
+	private async Task HandleKeyDown(KeyboardEventArgs args) {
+		if (args.Key == "Escape") {
+			Cancel();
+			return;
+		}
+
+		if (args.Key == "Enter") {
+			Confirm();
+			await Task.CompletedTask;
+		}
+	}
+
+	private void Cancel() => MudDialog.Cancel();
+
+	private void Confirm() => MudDialog.Close(DialogResult.Ok(true));
+}

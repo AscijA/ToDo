@@ -1,0 +1,29 @@
+<MudText Typo="Typo.subtitle1">This device</MudText>
+<MudPaper Class="pa-3" Elevation="0" Outlined="true">
+	<MudStack Spacing="1">
+		<MudText Typo="Typo.body2">@DeviceName</MudText>
+		<MudText Typo="Typo.caption" Color="Color.Secondary">@DeviceId</MudText>
+		@if (Status.IsRunning) {
+			<MudText Typo="Typo.caption" Color="Color.Success">
+				Listening at @Status.Address:@Status.Port
+			</MudText>
+		}
+		else if (!string.IsNullOrWhiteSpace(Status.Error)) {
+			<MudText Typo="Typo.caption" Color="Color.Error">@Status.Error</MudText>
+		}
+		else {
+			<MudText Typo="Typo.caption" Color="Color.Secondary">Local sync listener stopped</MudText>
+		}
+	</MudStack>
+</MudPaper>
+
+@code {
+	[Parameter]
+	public string DeviceName { get; set; } = string.Empty;
+
+	[Parameter]
+	public string DeviceId { get; set; } = string.Empty;
+
+	[Parameter]
+	public SyncTransportStatus Status { get; set; } = new(false, null, null, null, null);
+}

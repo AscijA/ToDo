@@ -1,21 +1,14 @@
 @inject IDailyPlanService TaskService
 @inject ISettingsService SettingsService
 
-<div class="title">
-	<MudIconButton Icon="@Icons.Material.Filled.NavigateBefore" aria-label="Previous week" Color="Color.Primary" Size="Size.Medium" OnClick="GoToPreviousWeek" />
-
-	<span class="title-date" onclick="@(async () => { await OnDateSelected(DateTime.Now); })">Week @GetWeekNumber(Date) · @Date.ToString("dd.MM.yyyy")</span>
-	<MudIconButton Icon="@Icons.Material.Filled.NavigateNext" aria-label="Next week" Color="Color.Primary" Size="Size.Medium" OnClick="GoToNextWeek" />
-
-	<MudMenu Icon="@Icons.Material.Filled.CalendarMonth" Color="Color.Primary" AnchorOrigin="Origin.BottomCenter" TransformOrigin="Origin.TopCenter">
-		<MudDatePicker PickerVariant="PickerVariant.Static"
-						Date="selectedDateTime"
-						DateChanged="OnDateSelected"
-						AutoClose="true"
-						ShowWeekNumbers="true"
-						ShowToolbar="false" />
-	</MudMenu>
-</div>
+<PlannerDateHeader Title="@($"Week {GetWeekNumber(Date)} - {Date:dd.MM.yyyy}")"
+					  SelectedDate="selectedDateTime"
+					  PreviousLabel="Previous week"
+					  NextLabel="Next week"
+					  OnPrevious="GoToPreviousWeek"
+					  OnNext="GoToNextWeek"
+					  OnToday="GoToToday"
+					  OnDateSelected="OnDateSelected" />
 
 @foreach (var item in WeeklyItems) {
 	<WeeklyItem @key="item.TaskDefinitionId"
@@ -69,6 +62,10 @@
 	private async Task GoToNextWeek() {
 		Date = Date.AddDays(7);
 		await SyncAndReloadAsync();
+	}
+
+	private async Task GoToToday() {
+		await OnDateSelected(DateTime.Now);
 	}
 
 	private async Task OnDateSelected(DateTime? newDate) {

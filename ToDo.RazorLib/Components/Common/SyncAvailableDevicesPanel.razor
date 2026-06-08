@@ -1,0 +1,56 @@
+<div class="d-flex align-center">
+	<MudText Typo="Typo.subtitle1">Available devices</MudText>
+	<MudSpacer />
+	<MudIconButton Icon="@Icons.Material.Filled.Refresh"
+						aria-label="Refresh available devices"
+						Size="Size.Small"
+						Color="Color.Primary"
+						Disabled="IsDiscovering"
+						OnClick="OnRefresh" />
+</div>
+<MudPaper Class="pa-3" Elevation="0" Outlined="true">
+	@if (IsDiscovering) {
+		<MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+	}
+	else if (Devices.Count == 0) {
+		<MudText Typo="Typo.body2" Color="Color.Secondary">@EmptyMessage</MudText>
+	}
+	else {
+		<MudList T="AvailableSyncDevice" Dense="true">
+			@foreach (var device in Devices) {
+				<MudListItem Value="@device">
+					<div class="d-flex align-center mud-width-full">
+						<MudStack Spacing="0">
+							<MudText Typo="Typo.body2">@device.DeviceName</MudText>
+							<MudText Typo="Typo.caption" Color="Color.Secondary">@device.Address</MudText>
+						</MudStack>
+						<MudSpacer />
+						<MudButton Size="Size.Small"
+									  Color="Color.Primary"
+									  Variant="Variant.Text"
+									  OnClick="@(() => OnPair.InvokeAsync(device))">
+							Pair
+						</MudButton>
+					</div>
+				</MudListItem>
+			}
+		</MudList>
+	}
+</MudPaper>
+
+@code {
+	[Parameter]
+	public IReadOnlyList<AvailableSyncDevice> Devices { get; set; } = Array.Empty<AvailableSyncDevice>();
+
+	[Parameter]
+	public bool IsDiscovering { get; set; }
+
+	[Parameter]
+	public string EmptyMessage { get; set; } = string.Empty;
+
+	[Parameter]
+	public EventCallback OnRefresh { get; set; }
+
+	[Parameter]
+	public EventCallback<AvailableSyncDevice> OnPair { get; set; }
+}

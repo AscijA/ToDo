@@ -27,21 +27,21 @@ public sealed class ManualAddressSyncDiscoveryService : ISyncDiscoveryService {
                 timeout.Token);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) {
-            return new SyncDiscoveryResult(Array.Empty<AvailableSyncDevice>(), $"No response from {address}.");
+            return new SyncDiscoveryResult(Array.Empty<AvailableSyncDevice>(), $"No device answered at {address}. Make sure Sync is turned on there and the address is correct.");
         }
-        catch (HttpRequestException ex) {
-            return new SyncDiscoveryResult(Array.Empty<AvailableSyncDevice>(), $"Could not reach {address}: {ex.Message}");
+        catch (HttpRequestException) {
+            return new SyncDiscoveryResult(Array.Empty<AvailableSyncDevice>(), $"Could not connect to {address}. Make sure both devices are on the same network and Sync is turned on.");
         }
         catch (NotSupportedException) {
-            return new SyncDiscoveryResult(Array.Empty<AvailableSyncDevice>(), $"{address} did not return a supported sync response.");
+            return new SyncDiscoveryResult(Array.Empty<AvailableSyncDevice>(), $"The device at {address} did not answer like a ToDo sync device.");
         }
 
         if (hello == null || string.IsNullOrWhiteSpace(hello.DeviceId) || string.IsNullOrWhiteSpace(hello.DeviceName)) {
-            return new SyncDiscoveryResult(Array.Empty<AvailableSyncDevice>(), $"{address} did not return a valid sync identity.");
+            return new SyncDiscoveryResult(Array.Empty<AvailableSyncDevice>(), $"The device at {address} did not send enough information to pair.");
         }
 
         if (string.Equals(hello.DeviceId, localDevice.DeviceId, StringComparison.OrdinalIgnoreCase)) {
-            return new SyncDiscoveryResult(Array.Empty<AvailableSyncDevice>(), "That address points to this device.");
+            return new SyncDiscoveryResult(Array.Empty<AvailableSyncDevice>(), "That address points to this device. Enter the address of the other device.");
         }
 
         var device = new AvailableSyncDevice(

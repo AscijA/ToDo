@@ -10,9 +10,11 @@ namespace ToDo.Application.Services;
 
 public class MonthlyOccurrenceService : IMonthlyOccurrenceService {
     private readonly IDbContextFactory<TodoDbContext> _contextFactory;
+    private readonly IDataChangeNotifier _dataChangeNotifier;
 
-    public MonthlyOccurrenceService(IDbContextFactory<TodoDbContext> contextFactory) {
+    public MonthlyOccurrenceService(IDbContextFactory<TodoDbContext> contextFactory, IDataChangeNotifier dataChangeNotifier) {
         _contextFactory = contextFactory;
+        _dataChangeNotifier = dataChangeNotifier;
     }
 
     public async Task<MonthlyItemDTO> GetByIdAsync(Guid occurenceId) {
@@ -52,6 +54,7 @@ public class MonthlyOccurrenceService : IMonthlyOccurrenceService {
         await SyncTaskCompletionStatus(context, monthlyItem.TaskDefinitionId, dto.IsDone);
 
         await context.SaveChangesAsync();
+        _dataChangeNotifier.NotifyChanged();
 
         var color = await context.TaskListItems
             .Where(i => i.TaskDefinitionId == monthlyItem.TaskDefinitionId)
@@ -68,6 +71,7 @@ public class MonthlyOccurrenceService : IMonthlyOccurrenceService {
             monthlyItem.IsDone = !monthlyItem.IsDone;
             await SyncTaskCompletionStatus(context, monthlyItem.TaskDefinitionId, monthlyItem.IsDone);
             await context.SaveChangesAsync();
+            _dataChangeNotifier.NotifyChanged();
         }
     }
 
@@ -91,6 +95,7 @@ public class MonthlyOccurrenceService : IMonthlyOccurrenceService {
         if (monthlyItem != null) {
             context.MonthlyOccurrences.Remove(monthlyItem);
             await context.SaveChangesAsync();
+            _dataChangeNotifier.NotifyChanged();
         }
     }
 

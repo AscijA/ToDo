@@ -38,6 +38,7 @@ public static class MauiProgram {
         builder.Services.AddSingleton<ISyncSnapshotService, SyncSnapshotService>();
         builder.Services.AddSingleton<ISyncTransportService, LocalHttpSyncTransportService>();
         builder.Services.AddSingleton<ISyncService, LocalSyncService>();
+        builder.Services.AddSingleton<IDataChangeNotifier, AutoSyncChangeNotifier>();
         builder.Services.AddSingleton<SyncModalRequestService>();
         builder.Services.AddScoped<ThemeStoreInterop>();
 

@@ -1,0 +1,38 @@
+@using ToDo.RazorLib.Components.Common
+
+@if (SelectedPage == MobileMorePage.None) {
+    <div class="mobile-settings-tab">
+        <button type="button" class="mobile-more-row" @onclick="@(() => OnPageSelected.InvokeAsync(MobileMorePage.Sync))">
+            <MudIcon Icon="@Icons.Material.Filled.Sync" Color="Color.Primary" />
+            <span>Sync</span>
+        </button>
+        <button type="button" class="mobile-more-row" @onclick="@(() => OnPageSelected.InvokeAsync(MobileMorePage.Settings))">
+            <MudIcon Icon="@Icons.Material.Filled.Settings" Color="Color.Primary" />
+            <span>Settings</span>
+        </button>
+    </div>
+}
+else if (SelectedPage == MobileMorePage.Sync) {
+    <div class="mobile-subpage">
+        <SyncPage ShowBackButton="true" OnBack="OnBack" />
+    </div>
+}
+else if (SelectedPage == MobileMorePage.Settings) {
+    <div class="mobile-subpage">
+        <SettingsPage ShowBackButton="true" OnBack="OnBack" OnSaved="OnSettingsSaved" />
+    </div>
+}
+
+@code {
+    [Parameter]
+    public MobileMorePage SelectedPage { get; set; }
+
+    [Parameter]
+    public EventCallback<MobileMorePage> OnPageSelected { get; set; }
+
+    [Parameter]
+    public EventCallback OnBack { get; set; }
+
+    [Parameter]
+    public EventCallback OnSettingsSaved { get; set; }
+}

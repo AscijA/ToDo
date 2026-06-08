@@ -1,0 +1,22 @@
+<MudText Typo="Typo.subtitle1">Paired devices</MudText>
+<MudPaper Class="pa-3" Elevation="0" Outlined="true">
+	@if (Devices.Count == 0) {
+		<MudText Typo="Typo.body2" Color="Color.Secondary">No paired devices yet.</MudText>
+	}
+	else {
+		<MudList T="PairedSyncDevice" Dense="true">
+			@foreach (var device in Devices) {
+				<SyncPairedDeviceListItem Device="@device"
+											  OnDevicesChanged="OnDevicesChanged" />
+			}
+		</MudList>
+	}
+</MudPaper>
+
+@code {
+	[Parameter]
+	public IReadOnlyList<PairedSyncDevice> Devices { get; set; } = Array.Empty<PairedSyncDevice>();
+
+	[Parameter]
+	public EventCallback OnDevicesChanged { get; set; }
+}

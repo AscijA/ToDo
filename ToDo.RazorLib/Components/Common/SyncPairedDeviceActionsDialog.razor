@@ -1,0 +1,239 @@
+@using ToDo.RazorLib.Services
+@inject ISyncService SyncService
+@inject IDialogService DialogService
+
+<MudDialog Style="width: 80vw; max-width: 80vw;">
+	<DialogContent>
+		<div @onkeydown="HandleKeyDown">
+			<MudStack Spacing="3">
+				<MudStack Spacing="0">
+					<MudText Typo="Typo.subtitle1">@Device.DeviceName</MudText>
+					<MudText Typo="Typo.caption" Color="@(Device.IsOnline ? Color.Success : Color.Secondary)">
+						@(Device.IsOnline ? "Online" : "Offline") - @Device.Address
+					</MudText>
+				</MudStack>
+
+				<MudButton StartIcon="@Icons.Material.Filled.NetworkPing"
+						   Color="Color.Primary"
+						   Variant="Variant.Text"
+						   Disabled="@_isPinging"
+						   FullWidth="true"
+						   Class="justify-start"
+						   OnClick="PingAsync">
+					@if (_isPinging) {
+						<MudProgressCircular Size="Size.Small" Indeterminate="true" />
+					}
+					else {
+						<span>Ping</span>
+					}
+				</MudButton>
+				<MudButton StartIcon="@Icons.Material.Filled.Inventory"
+						   Color="Color.Primary"
+						   Variant="Variant.Text"
+						   Disabled="@_isFetchingSnapshot"
+						   FullWidth="true"
+						   Class="justify-start"
+						   OnClick="FetchSnapshotAsync">
+					@if (_isFetchingSnapshot) {
+						<MudProgressCircular Size="Size.Small" Indeterminate="true" />
+					}
+					else {
+						<span>Snapshot</span>
+					}
+				</MudButton>
+				<MudButton StartIcon="@Icons.Material.Filled.Visibility"
+						   Color="Color.Primary"
+						   Variant="Variant.Text"
+						   Disabled="@_isPreviewing"
+						   FullWidth="true"
+						   Class="justify-start"
+						   OnClick="PreviewAsync">
+					@if (_isPreviewing) {
+						<MudProgressCircular Size="Size.Small" Indeterminate="true" />
+					}
+					else {
+						<span>Preview</span>
+					}
+				</MudButton>
+				<MudButton StartIcon="@Icons.Material.Filled.Download"
+						   Color="Color.Primary"
+						   Variant="Variant.Text"
+						   Disabled="@_isImporting"
+						   FullWidth="true"
+						   Class="justify-start"
+						   OnClick="ImportRemoteNewAsync">
+					@if (_isImporting) {
+						<MudProgressCircular Size="Size.Small" Indeterminate="true" />
+					}
+					else {
+						<span>Import New</span>
+					}
+				</MudButton>
+				<MudButton StartIcon="@Icons.Material.Filled.Delete"
+						   Color="Color.Error"
+						   Variant="Variant.Text"
+						   FullWidth="true"
+						   Class="justify-start"
+						   OnClick="RemoveAsync">
+					Remove
+				</MudButton>
+
+				@if (!string.IsNullOrWhiteSpace(_message)) {
+					<MudAlert Severity="@_messageSeverity" Dense="true">@_message</MudAlert>
+				}
+			</MudStack>
+		</div>
+	</DialogContent>
+	<DialogActions>
+		<MudButton OnClick="Cancel">Cancel</MudButton>
+	</DialogActions>
+</MudDialog>
+
+@code {
+	[CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+	[Parameter, EditorRequired]
+	public PairedSyncDevice Device { get; set; } = null!;
+
+	[Parameter]
+	public EventCallback OnDevicesChanged { get; set; }
+
+	private bool _isPinging;
+	private bool _isFetchingSnapshot;
+	private bool _isPreviewing;
+	private bool _isImporting;
+	private string? _message;
+	private Severity _messageSeverity = Severity.Info;
+
+	private void Cancel() => MudDialog.Cancel();
+
+	private void HandleKeyDown(KeyboardEventArgs args) {
+		if (args.Key == "Escape") {
+			Cancel();
+		}
+	}
+
+	private async Task PingAsync() {
+		_message = null;
+		_isPinging = true;
+
+		try {
+			var updatedDevice = await SyncService.PingPairedDeviceAsync(Device);
+			Device = updatedDevice;
+			_messageSeverity = Severity.Success;
+			_message = $"{updatedDevice.DeviceName} responded.";
+			await OnDevicesChanged.InvokeAsync();
+		}
+		catch (Exception ex) {
+			_messageSeverity = Severity.Warning;
+			_message = SyncUserMessages.Explain(ex);
+			await OnDevicesChanged.InvokeAsync();
+		}
+		finally {
+			_isPinging = false;
+		}
+	}
+
+	private async Task FetchSnapshotAsync() {
+		_message = null;
+		_isFetchingSnapshot = true;
+
+		try {
+			var snapshot = await SyncService.FetchSnapshotAsync(Device);
+			_messageSeverity = Severity.Success;
+			_message = $"{snapshot.DeviceName} snapshot: {snapshot.TaskLists.Count} lists, {snapshot.TaskListItems.Count} list items, {snapshot.DailyOccurrences.Count + snapshot.WeeklyOccurrences.Count + snapshot.MonthlyOccurrences.Count} planner items.";
+		}
+		catch (Exception ex) {
+			_messageSeverity = Severity.Warning;
+			_message = SyncUserMessages.Explain(ex);
+		}
+		finally {
+			_isFetchingSnapshot = false;
+		}
+	}
+
+	private async Task PreviewAsync() {
+		_message = null;
+		_isPreviewing = true;
+
+		try {
+			var preview = await SyncService.PreviewSyncAsync(Device);
+			_messageSeverity = preview.ChangedCount == 0 ? Severity.Success : Severity.Warning;
+			_message = FormatPreviewMessage(preview);
+		}
+		catch (Exception ex) {
+			_messageSeverity = Severity.Warning;
+			_message = SyncUserMessages.Explain(ex);
+		}
+		finally {
+			_isPreviewing = false;
+		}
+	}
+
+	private async Task ImportRemoteNewAsync() {
+		_message = null;
+		_isImporting = true;
+
+		try {
+			var preview = await SyncService.PreviewSyncAsync(Device);
+			_messageSeverity = preview.ChangedCount == 0 ? Severity.Success : Severity.Warning;
+			_message = FormatPreviewMessage(preview);
+
+			var parameters = new DialogParameters {
+				[nameof(SyncImportConfirmDialog.Preview)] = preview
+			};
+			var dialog = await DialogService.ShowAsync<SyncImportConfirmDialog>("Confirm Import", parameters);
+			var result = await dialog.Result;
+			if (result?.Canceled != false) {
+				return;
+			}
+
+			var import = await SyncService.ImportRemoteNewAsync(Device);
+			_messageSeverity = import.SkippedCount == 0 ? Severity.Success : Severity.Warning;
+			_message = FormatImportMessage(import);
+			await OnDevicesChanged.InvokeAsync();
+		}
+		catch (Exception ex) {
+			_messageSeverity = Severity.Warning;
+			_message = SyncUserMessages.Explain(ex);
+		}
+		finally {
+			_isImporting = false;
+		}
+	}
+
+	private async Task RemoveAsync() {
+		MudDialog.Close();
+		SyncService.RemovePairedDevice(Device.DeviceId);
+		await OnDevicesChanged.InvokeAsync();
+	}
+
+	private static string FormatPreviewMessage(SyncPreviewSummary preview) {
+		var changedDetails = preview.EntityCounts
+			.Where(count => count.NewCount > 0 || count.ChangedCount > 0 || count.LocalOnlyCount > 0)
+			.Select(count => $"{count.Name}: +{count.NewCount}, changed {count.ChangedCount}, local-only {count.LocalOnlyCount}");
+
+		var details = string.Join("; ", changedDetails);
+		if (string.IsNullOrWhiteSpace(details)) {
+			details = "no remote changes found";
+		}
+
+		var conflictDetails = preview.Conflicts.Count == 0
+			? string.Empty
+			: $" Conflicts: {string.Join("; ", preview.Conflicts.Take(3).Select(conflict => conflict.Label))}.";
+
+		return $"{preview.DeviceName} preview: {preview.NewCount} new, {preview.MatchingCount} matching, {preview.ChangedCount} changed, {preview.LocalOnlyCount} local-only. {details}.{conflictDetails}";
+	}
+
+	private static string FormatImportMessage(SyncImportSummary import) {
+		var details = string.Join("; ", import.EntityCounts
+			.Where(count => count.ImportedCount > 0 || count.SkippedCount > 0)
+			.Select(count => $"{count.Name}: imported {count.ImportedCount}, skipped {count.SkippedCount}"));
+
+		if (string.IsNullOrWhiteSpace(details)) {
+			details = "nothing new to import";
+		}
+
+		return $"{import.DeviceName} import: {import.ImportedCount} imported, {import.SkippedCount} skipped. {details}.";
+	}
+}

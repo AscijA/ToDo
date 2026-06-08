@@ -102,7 +102,8 @@ public sealed record SyncSnapshotResponse(
 public sealed record SyncPreviewSummary(
     string DeviceName,
     DateTimeOffset CreatedAt,
-    IReadOnlyList<SyncEntityPreviewCount> EntityCounts) {
+    IReadOnlyList<SyncEntityPreviewCount> EntityCounts,
+    IReadOnlyList<SyncConflictDetail> Conflicts) {
     public int NewCount => EntityCounts.Sum(count => count.NewCount);
     public int MatchingCount => EntityCounts.Sum(count => count.MatchingCount);
     public int ChangedCount => EntityCounts.Sum(count => count.ChangedCount);
@@ -115,6 +116,29 @@ public sealed record SyncEntityPreviewCount(
     int MatchingCount,
     int ChangedCount,
     int LocalOnlyCount);
+
+public sealed record SyncConflictDetail(
+    string EntityName,
+    Guid Id,
+    string Label,
+    IReadOnlyList<SyncFieldConflict> Fields);
+
+public sealed record SyncFieldConflict(
+    string Name,
+    string LocalValue,
+    string RemoteValue);
+
+public sealed record SyncImportSummary(
+    string DeviceName,
+    IReadOnlyList<SyncEntityImportCount> EntityCounts) {
+    public int ImportedCount => EntityCounts.Sum(count => count.ImportedCount);
+    public int SkippedCount => EntityCounts.Sum(count => count.SkippedCount);
+}
+
+public sealed record SyncEntityImportCount(
+    string Name,
+    int ImportedCount,
+    int SkippedCount);
 
 public sealed record SyncTaskDefinitionSnapshot(
     Guid Id,

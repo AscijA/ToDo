@@ -11,9 +11,11 @@ namespace ToDo.Application.Services;
 
 public class DailyPlanService : IDailyPlanService {
     private readonly IDbContextFactory<TodoDbContext> _contextFactory;
+    private readonly IDataChangeNotifier _dataChangeNotifier;
 
-    public DailyPlanService(IDbContextFactory<TodoDbContext> contextFactory) {
+    public DailyPlanService(IDbContextFactory<TodoDbContext> contextFactory, IDataChangeNotifier dataChangeNotifier) {
         _contextFactory = contextFactory;
+        _dataChangeNotifier = dataChangeNotifier;
     }
 
     public async Task<List<DailyItemDTO>> GetAllDailyOfDateAsync(DateOnly date) {
@@ -44,6 +46,17 @@ public class DailyPlanService : IDailyPlanService {
 
     public async Task<DailyItemDTO> AddTaskToDateAsync(DateOnly date, DailyItemDTO dto) {
         using var context = await _contextFactory.CreateDbContextAsync();
+
+        if (dto.TaskDefinitionId != Guid.Empty) {
+            var existingOccurrence = await context.DailyOccurrences
+                .Include(o => o.TaskDefinition)
+                .FirstOrDefaultAsync(o => o.DailyPlan.Date == date && o.TaskDefinitionId == dto.TaskDefinitionId);
+            if (existingOccurrence != null) {
+                var existingColor = await GetTaskListColorAsync(context, existingOccurrence.TaskDefinitionId);
+                return existingOccurrence.ToDailyItem(existingColor);
+            }
+        }
+
         var dailyPlan = await context.DailyPlans
             .FirstOrDefaultAsync(x => x.Date == date);
         if (dailyPlan == null) {
@@ -73,11 +86,9 @@ public class DailyPlanService : IDailyPlanService {
         };
         dailyOccurrence = context.DailyOccurrences.Add(dailyOccurrence).Entity;
         await context.SaveChangesAsync();
+        _dataChangeNotifier.NotifyChanged();
         
-        var color = await context.TaskListItems
-            .Where(i => i.TaskDefinitionId == dailyOccurrence.TaskDefinitionId)
-            .Select(i => i.TaskList!.Color)
-            .FirstOrDefaultAsync();
+        var color = await GetTaskListColorAsync(context, dailyOccurrence.TaskDefinitionId);
 
         return dailyOccurrence.ToDailyItem(color);
     }
@@ -120,7 +131,10 @@ public class DailyPlanService : IDailyPlanService {
                 catch (ArgumentOutOfRangeException) { }
             }
         }
-        if (changed) await context.SaveChangesAsync();
+        if (changed) {
+            await context.SaveChangesAsync();
+            _dataChangeNotifier.NotifyChanged();
+        }
 
         var items = await context.WeeklyOccurrences.AsNoTracking()
             .Include(w => w.TaskDefinition)
@@ -150,6 +164,18 @@ public class DailyPlanService : IDailyPlanService {
     public async Task<WeeklyItemDTO> AddTaskToWeekAsync(DateOnly date, WeeklyItemDTO dto) {
         using var context = await _contextFactory.CreateDbContextAsync();
         var weekStart = GetWeekStart(date);
+
+        if (dto.TaskDefinitionId != Guid.Empty) {
+            var existingOccurrence = await context.WeeklyOccurrences
+                .Include(o => o.TaskDefinition)
+                .Include(o => o.WeeklyPlan)
+                .FirstOrDefaultAsync(o => o.WeeklyPlan.Date == weekStart && o.TaskDefinitionId == dto.TaskDefinitionId);
+            if (existingOccurrence != null) {
+                var existingColor = await GetTaskListColorAsync(context, existingOccurrence.TaskDefinitionId);
+                return existingOccurrence.ToWeeklyItem(existingColor);
+            }
+        }
+
         var weeklyPlan = await GetOrCreateWeeklyPlanAsync(context, weekStart);
         
         TaskDefinition? taskDef = null;
@@ -170,11 +196,9 @@ public class DailyPlanService : IDailyPlanService {
         };
         weeklyOccurrence = context.WeeklyOccurrences.Add(weeklyOccurrence).Entity;
         await context.SaveChangesAsync();
+        _dataChangeNotifier.NotifyChanged();
 
-        var color = await context.TaskListItems
-            .Where(i => i.TaskDefinitionId == weeklyOccurrence.TaskDefinitionId)
-            .Select(i => i.TaskList!.Color)
-            .FirstOrDefaultAsync();
+        var color = await GetTaskListColorAsync(context, weeklyOccurrence.TaskDefinitionId);
 
         return weeklyOccurrence.ToWeeklyItem(color);
     }
@@ -211,6 +235,18 @@ public class DailyPlanService : IDailyPlanService {
     public async Task<MonthlyItemDTO> AddTaskToMonthAsync(DateOnly date, MonthlyItemDTO dto) {
         using var context = await _contextFactory.CreateDbContextAsync();
         var monthStart = new DateOnly(date.Year, date.Month, 1);
+
+        if (dto.TaskDefinitionId != Guid.Empty) {
+            var existingOccurrence = await context.MonthlyOccurrences
+                .Include(o => o.TaskDefinition)
+                .Include(o => o.MonthlyPlan)
+                .FirstOrDefaultAsync(o => o.MonthlyPlan.Date == monthStart && o.TaskDefinitionId == dto.TaskDefinitionId);
+            if (existingOccurrence != null) {
+                var existingColor = await GetTaskListColorAsync(context, existingOccurrence.TaskDefinitionId);
+                return existingOccurrence.ToMonthlyItem(existingColor);
+            }
+        }
+
         var monthlyPlan = await GetOrCreateMonthlyPlanAsync(context, monthStart);
         
         TaskDefinition? taskDef = null;
@@ -231,13 +267,18 @@ public class DailyPlanService : IDailyPlanService {
         };
         monthlyOccurrence = context.MonthlyOccurrences.Add(monthlyOccurrence).Entity;
         await context.SaveChangesAsync();
+        _dataChangeNotifier.NotifyChanged();
 
-        var color = await context.TaskListItems
-            .Where(i => i.TaskDefinitionId == monthlyOccurrence.TaskDefinitionId)
-            .Select(i => i.TaskList!.Color)
-            .FirstOrDefaultAsync();
+        var color = await GetTaskListColorAsync(context, monthlyOccurrence.TaskDefinitionId);
 
         return monthlyOccurrence.ToMonthlyItem(color);
+    }
+
+    private static Task<string?> GetTaskListColorAsync(TodoDbContext context, Guid taskDefinitionId) {
+        return context.TaskListItems
+            .Where(i => i.TaskDefinitionId == taskDefinitionId)
+            .Select(i => i.TaskList == null ? null : i.TaskList.Color)
+            .FirstOrDefaultAsync();
     }
 
     private static TaskDefinition CreateTaskDefinition(string title, string? description) {

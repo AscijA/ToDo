@@ -1,0 +1,310 @@
+@using ToDo.RazorLib.Services
+@inject ISyncService SyncService
+@inject ISyncTransportService SyncTransportService
+@implements IDisposable
+
+<MudPaper Class="panel-daily mud-height-full rounded" Elevation="1" Style="height: 100%; max-height: 100%; overflow-y: auto; box-sizing: border-box;">
+	<div>
+		<MudStack Spacing="4">
+			<div class="sync-page-header">
+				@if (ShowBackButton) {
+					<MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
+										aria-label="Back"
+										Color="Color.Primary"
+										Size="Size.Small"
+										OnClick="OnBack" />
+				}
+				<MudText Typo="Typo.h6">Sync</MudText>
+			</div>
+
+			<MudSwitch T="bool"
+						  @bind-Value="_syncEnabled"
+						  @bind-Value:after="SaveSyncSettingsAsync"
+						  Color="Color.Primary"
+						  Label="Sync" />
+
+			<MudTextField @bind-Value="_deviceName"
+							  @bind-Value:after="SaveSyncSettingsAsync"
+							  Label="Device Name"
+							  Required="true" />
+
+			<MudSwitch T="bool"
+						  @bind-Value="_autoSync"
+						  @bind-Value:after="SaveSyncSettingsAsync"
+						  Color="Color.Primary"
+						  Disabled="!_syncEnabled"
+						  Label="Auto sync on changes" />
+
+			<MudTextField @bind-Value="_manualAddress"
+							  @bind-Value:after="SaveSyncSettingsAsync"
+							  Label="Manual device address"
+							  Placeholder="192.168.1.25:51234" />
+
+			<MudDivider />
+
+			<SyncLocalStatusCard DeviceName="@_deviceName"
+									 DeviceId="@_deviceId"
+									 Status="@_transportStatus" />
+
+			<SyncIncomingPairingRequests Requests="_incomingPairingRequests"
+												  OnApprove="ApproveIncomingPairing"
+												  OnReject="RejectIncomingPairing" />
+
+			<SyncAvailableDevicesPanel Devices="_availableDevices"
+												IsDiscovering="_isDiscovering"
+												EmptyMessage="@GetDiscoveryMessage()"
+												OnRefresh="RefreshAvailableDevicesAsync"
+												OnPair="StartPairingAsync" />
+
+			<SyncPairingPanel Session="@_pairingSession"
+								  PairingCode="@_pairingCodeConfirmation"
+								  PairingCodeChanged="OnPairingCodeChanged"
+								  PairingCodeMask="pairingCodeMask"
+								  Message="@_pairingMessage"
+								  IsBusy="_isPairingBusy"
+								  CanConfirm="@CanConfirmPairing()"
+								  OnCancel="CancelPairing"
+								  OnConfirm="ConfirmPairing" />
+
+			<SyncPairedDevicesPanel Devices="_pairedDevices"
+											OnDevicesChanged="RefreshPairedDevicesAsync" />
+		</MudStack>
+	</div>
+</MudPaper>
+
+@code {
+	[Parameter]
+	public bool ShowBackButton { get; set; }
+
+	[Parameter]
+	public EventCallback OnBack { get; set; }
+
+	private bool _syncEnabled;
+	private bool _autoSync;
+	private string _deviceName = string.Empty;
+	private string _deviceId = string.Empty;
+	private string _manualAddress = string.Empty;
+	private IReadOnlyList<AvailableSyncDevice> _availableDevices = Array.Empty<AvailableSyncDevice>();
+	private IReadOnlyList<PairedSyncDevice> _pairedDevices = Array.Empty<PairedSyncDevice>();
+	private IReadOnlyList<IncomingPairingRequest> _incomingPairingRequests = Array.Empty<IncomingPairingRequest>();
+	private SyncPairingSession? _pairingSession;
+	private SyncTransportStatus _transportStatus = new(false, null, null, null, null);
+	private string _pairingCodeConfirmation = string.Empty;
+	private string? _discoveryMessage;
+	private string? _pairingMessage;
+	private PeriodicTimer? _incomingPairingTimer;
+	private CancellationTokenSource? _incomingPairingTimerCancellation;
+	private bool _isDiscovering;
+	private IMask pairingCodeMask = new PatternMask("000-000");
+	private bool _isPairingBusy;
+
+	protected override async Task OnInitializedAsync() {
+		var identity = SyncService.GetLocalDevice();
+		_syncEnabled = identity.SyncEnabled;
+		_autoSync = identity.AutoSyncOnChanges;
+		_deviceId = identity.DeviceId;
+		_deviceName = identity.DeviceName;
+		_manualAddress = identity.ManualAddress;
+		_pairedDevices = SyncService.GetPairedDevices();
+		await ApplyTransportStateAsync();
+		RefreshIncomingPairingRequests();
+		StartIncomingPairingRefresh();
+
+		await RefreshAvailableDevicesAsync();
+	}
+
+	private async Task SaveSyncSettingsAsync() {
+		if (string.IsNullOrWhiteSpace(_deviceName)) {
+			return;
+		}
+
+		SaveCurrentIdentity();
+		await ApplyTransportStateAsync();
+		StateHasChanged();
+	}
+
+	private async Task RefreshAvailableDevicesAsync() {
+		SaveCurrentIdentity();
+		_isDiscovering = true;
+
+		try {
+			var discovery = await SyncService.DiscoverAvailableDevicesAsync();
+			_availableDevices = discovery.Devices;
+			_discoveryMessage = SyncUserMessages.Discovery(discovery.Message);
+		}
+		finally {
+			_isDiscovering = false;
+		}
+	}
+
+	private void SaveCurrentIdentity() {
+		SyncService.SaveLocalDevice(new SyncDeviceIdentity(
+			_deviceId,
+			string.IsNullOrWhiteSpace(_deviceName) ? "ToDo Device" : _deviceName,
+			_syncEnabled,
+			_autoSync,
+			_manualAddress));
+	}
+
+	private async Task ApplyTransportStateAsync() {
+		var identity = SyncService.GetLocalDevice();
+		if (identity.SyncEnabled) {
+			await SyncTransportService.StartAsync(identity);
+		}
+		else {
+			await SyncTransportService.StopAsync();
+		}
+
+		_transportStatus = SyncTransportService.GetStatus();
+		RefreshIncomingPairingRequests();
+	}
+
+	private async Task StartPairingAsync(AvailableSyncDevice device) {
+		_pairingMessage = null;
+		_isPairingBusy = true;
+		var localAddress = GetLocalSyncAddress();
+		if (string.IsNullOrWhiteSpace(localAddress)) {
+			_pairingMessage = "Turn Sync on before pairing.";
+			_isPairingBusy = false;
+			return;
+		}
+
+		try {
+			_pairingSession = await SyncService.StartPairingAsync(device, localAddress);
+		}
+		catch (Exception ex) {
+			_pairingMessage = SyncUserMessages.Explain(ex);
+			_isPairingBusy = false;
+			return;
+		}
+
+		if (_pairingSession == null) {
+			_pairingMessage = $"Could not start pairing with {device.DeviceName}.";
+			_isPairingBusy = false;
+			return;
+		}
+
+		_pairingMessage = "Approve this request on the other device, then enter the matching code here.";
+		_pairingCodeConfirmation = string.Empty;
+		_isPairingBusy = false;
+	}
+
+	private void CancelPairing() {
+		_pairingSession = null;
+		_pairingCodeConfirmation = string.Empty;
+	}
+
+	private void OnPairingCodeChanged(string value) {
+		_pairingCodeConfirmation = value;
+	}
+
+	private async Task ConfirmPairing() {
+		if (_pairingSession == null || !CanConfirmPairing()) {
+			return;
+		}
+
+		_pairingMessage = null;
+		_isPairingBusy = true;
+		bool paired;
+		try {
+			paired = await SyncService.ConfirmPairingAsync(_pairingSession, GetLocalSyncAddress());
+		}
+		catch (Exception ex) {
+			_pairingMessage = SyncUserMessages.Explain(ex);
+			_isPairingBusy = false;
+			return;
+		}
+
+		if (!paired) {
+			_pairingMessage = "Pairing failed. Check that the code still matches and try again.";
+			_isPairingBusy = false;
+			return;
+		}
+
+		_isPairingBusy = false;
+		_pairingSession = null;
+		_pairingCodeConfirmation = string.Empty;
+		_pairingMessage = null;
+		_pairedDevices = SyncService.GetPairedDevices();
+		await RefreshAvailableDevicesAsync();
+		StateHasChanged();
+	}
+
+	private void ApproveIncomingPairing(string sessionId) {
+		SyncTransportService.ApproveIncomingPairing(sessionId);
+		RefreshIncomingPairingRequests();
+	}
+
+	private void RejectIncomingPairing(string sessionId) {
+		SyncTransportService.RejectIncomingPairing(sessionId);
+		RefreshIncomingPairingRequests();
+	}
+
+	private void RefreshIncomingPairingRequests() {
+		_incomingPairingRequests = SyncTransportService.GetIncomingPairingRequests();
+	}
+
+	private void StartIncomingPairingRefresh() {
+		_incomingPairingTimerCancellation = new CancellationTokenSource();
+		_incomingPairingTimer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+		_ = RunIncomingPairingRefreshAsync(_incomingPairingTimerCancellation.Token);
+	}
+
+	private async Task RunIncomingPairingRefreshAsync(CancellationToken cancellationToken) {
+		if (_incomingPairingTimer == null) {
+			return;
+		}
+
+		try {
+			while (await _incomingPairingTimer.WaitForNextTickAsync(cancellationToken)) {
+				await InvokeAsync(() => {
+					RefreshIncomingPairingRequests();
+					StateHasChanged();
+				});
+			}
+		}
+		catch (OperationCanceledException) {
+		}
+	}
+
+	private bool CanConfirmPairing() {
+		return _pairingSession != null
+			&& _pairingSession.ExpiresAt >= DateTimeOffset.Now
+			&& string.Equals(
+				NormalizePairingCode(_pairingCodeConfirmation),
+				NormalizePairingCode(_pairingSession.VerificationCode),
+				StringComparison.Ordinal);
+	}
+
+	private static string NormalizePairingCode(string code) {
+		return new string(code.Where(char.IsDigit).ToArray());
+	}
+
+	private string GetDiscoveryMessage() {
+		if (!string.IsNullOrWhiteSpace(_discoveryMessage)) {
+			return _discoveryMessage;
+		}
+
+		return string.IsNullOrWhiteSpace(_manualAddress)
+			? "Enter a manual address and refresh."
+			: "No devices found yet.";
+	}
+
+	private string GetLocalSyncAddress() {
+		return _transportStatus is { IsRunning: true, Address: not null, Port: not null }
+			? $"{_transportStatus.Address}:{_transportStatus.Port}"
+			: string.Empty;
+	}
+
+	private async Task RefreshPairedDevicesAsync() {
+		_pairedDevices = SyncService.GetPairedDevices();
+		await RefreshAvailableDevicesAsync();
+		StateHasChanged();
+	}
+
+	public void Dispose() {
+		_incomingPairingTimerCancellation?.Cancel();
+		_incomingPairingTimerCancellation?.Dispose();
+		_incomingPairingTimer?.Dispose();
+	}
+}

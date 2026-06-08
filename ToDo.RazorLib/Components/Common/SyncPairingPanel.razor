@@ -1,0 +1,66 @@
+@if (Session != null) {
+	<MudPaper Class="pa-3" Elevation="0" Outlined="true">
+		<MudStack Spacing="2">
+			<MudText Typo="Typo.subtitle2">Pair with @Session.DeviceName</MudText>
+			<MudText Typo="Typo.body2">Confirm this code on both devices.</MudText>
+			<MudText Typo="Typo.h5" Align="Align.Center">@Session.VerificationCode</MudText>
+			<MudTextField T="string"
+							  Value="PairingCode"
+							  ValueChanged="OnPairingCodeChanged"
+							  Label="Code from other device"
+							  Placeholder="000-000"
+							  Mask="@PairingCodeMask" />
+			@if (!string.IsNullOrWhiteSpace(Message)) {
+				<MudAlert Severity="Severity.Warning" Dense="true">@Message</MudAlert>
+			}
+			<div class="d-flex justify-end gap-2">
+				<MudButton Size="Size.Small" Disabled="IsBusy" OnClick="OnCancel">Cancel</MudButton>
+				<MudButton Size="Size.Small"
+							  Color="Color.Primary"
+							  Disabled="@(IsBusy || !CanConfirm)"
+							  OnClick="OnConfirm">
+					@if (IsBusy) {
+						<MudProgressCircular Size="Size.Small" Indeterminate="true" />
+					}
+					else {
+						<span>Confirm</span>
+					}
+				</MudButton>
+			</div>
+		</MudStack>
+	</MudPaper>
+}
+else if (!string.IsNullOrWhiteSpace(Message)) {
+	<MudAlert Severity="Severity.Warning" Dense="true">@Message</MudAlert>
+}
+
+@code {
+	[Parameter]
+	public SyncPairingSession? Session { get; set; }
+
+	[Parameter]
+	public string PairingCode { get; set; } = string.Empty;
+
+	[Parameter]
+	public EventCallback<string> PairingCodeChanged { get; set; }
+
+	[Parameter]
+	public IMask? PairingCodeMask { get; set; }
+
+	[Parameter]
+	public string? Message { get; set; }
+
+	[Parameter]
+	public bool IsBusy { get; set; }
+
+	[Parameter]
+	public bool CanConfirm { get; set; }
+
+	[Parameter]
+	public EventCallback OnCancel { get; set; }
+
+	[Parameter]
+	public EventCallback OnConfirm { get; set; }
+
+	private Task OnPairingCodeChanged(string value) => PairingCodeChanged.InvokeAsync(value);
+}
