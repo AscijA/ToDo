@@ -11,6 +11,37 @@
    <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" rel="stylesheet" />
    <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
    <link rel="icon" href="data:,">
+   <script>
+      (function () {
+         var bg = localStorage.getItem('theme_background');
+         var pr = localStorage.getItem('theme_primary');
+         if (!bg) {
+            var systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            bg = systemDark ? '#282C34' : '#F5F5F5';
+            pr = '#C678DD';
+         }
+         document.documentElement.style.setProperty('--splash-bg', bg);
+         document.documentElement.style.setProperty('--splash-primary', pr || '#C678DD');
+      })();
+   </script>
+   <style>
+      html, body { height: 100%; margin: 0; background: var(--splash-bg); }
+      .splash-loader {
+         min-height: 100vh;
+         display: flex;
+         align-items: center;
+         justify-content: center;
+         background: var(--splash-bg);
+      }
+      .splash-spinner {
+         width: 48px; height: 48px;
+         border: 4px solid transparent;
+         border-top-color: var(--splash-primary);
+         border-radius: 50%;
+         animation: spin 0.8s linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+   </style>
 </head>
 
 <body>
@@ -18,18 +49,8 @@
    <div class="status-bar-safe-area"></div>
 
    <div id="app">
-      <div class="mudblazor-splash">
-         <div class="mud-progress-circular mud-primary-text mud-progress-large mud-progress-indeterminate"
-              role="progressbar"
-              aria-busy="true"
-              aria-valuenow="0"
-              aria-valuemin="0"
-              aria-valuemax="100">
-            <svg class="mud-progress-circular-svg" viewBox="22.5 22.5 43 43">
-               <circle class="mud-progress-circular-circle mud-progress-indeterminate "
-                       cx="44" cy="44" r="20" fill="none" stroke-width="3"></circle>
-            </svg>
-         </div>
+      <div class="splash-loader">
+         <div class="splash-spinner"></div>
       </div>
    </div>
 
@@ -40,27 +61,8 @@
    </div>
 
    <script src="_framework/blazor.webview.js" autostart="false"></script>
-
    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
-   <style>
-      .mudblazor-splash {
-         min-height: 100vh;
-         display: flex;
-         flex-direction: column;
-         align-items: center;
-         justify-content: center;
-         background: #282C34;
-      }
-      html, body {
-         height: 100%;
-         margin: 0;
-         background: #282C34;
-         color: #C678DD;
-      }
-      .mud-splash .mud-progress-circular-circle {
-         stroke: #C678DD !important;
-      }
-   </style>
+   <script src="_content/ToDo.RazorLib/theme-store.js"></script>
 </body>
 
 </html>

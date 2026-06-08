@@ -11,6 +11,7 @@
 @inject IDialogService DialogService
 @inject ISettingsService SettingsService
 @inject SyncModalRequestService SyncModalRequests
+@inject ThemeStoreInterop ThemeStore
 @implements IDisposable
 
 <MudThemeProvider @ref="_mudThemeProvider"
@@ -142,14 +143,22 @@
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender) {
-        if (firstRender && _appearance == "System" && _mudThemeProvider != null) {
-            await _mudThemeProvider.WatchSystemDarkModeAsync(OnSystemDarkModeChanged);
-            var systemDarkMode = await _mudThemeProvider.GetSystemDarkModeAsync();
-            if (_isDarkMode != systemDarkMode) {
-                _isDarkMode = systemDarkMode;
-                StateHasChanged();
+        if (firstRender) {
+            if (_appearance == "System" && _mudThemeProvider != null) {
+                await _mudThemeProvider.WatchSystemDarkModeAsync(OnSystemDarkModeChanged);
+                var systemDarkMode = await _mudThemeProvider.GetSystemDarkModeAsync();
+                if (_isDarkMode != systemDarkMode) {
+                    _isDarkMode = systemDarkMode;
+                }
             }
+            await PersistThemeAsync();
+            StateHasChanged();
         }
+    }
+
+    private async Task PersistThemeAsync() {
+        var (primary, background) = Themes.GetColors(_currentTheme, _isDarkMode);
+        await ThemeStore.PersistAsync(primary, background, _isDarkMode);
     }
 
     private void SetTab(int index) {
@@ -166,7 +175,8 @@
             _isDarkMode = false;
         else if (_appearance == "Dark")
             _isDarkMode = true;
-
+        // For "System", leave _isDarkMode at its current value — 
+        // it will be resolved in OnAfterRenderAsync
         var themeName = SettingsService.Get("Theme", "ODP");
         if (themeName == "Custom") {
             var primary = SettingsService.Get("Custom_Primary", "#C678DD");
@@ -188,6 +198,7 @@
     private Task OnSystemDarkModeChanged(bool isDarkMode) {
         if (_appearance == "System") {
             _isDarkMode = isDarkMode;
+            _ = PersistThemeAsync();
             StateHasChanged();
         }
         return Task.CompletedTask;

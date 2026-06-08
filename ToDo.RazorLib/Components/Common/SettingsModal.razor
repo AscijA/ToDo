@@ -1,5 +1,6 @@
 @using ToDo.RazorLib.Services
 @inject ISettingsService SettingsService
+@inject ThemeStoreInterop ThemeStore
 
 
 <MudDialog>
@@ -113,11 +114,11 @@
       }
 
       if (args.Key == "Enter") {
-         Submit();
+         _ = Submit();
       }
    }
 
-   private void Submit() {
+   private async Task Submit() {
       SettingsService.Set("Appearance", _appearance);
       SettingsService.Set("Theme", _themeName);
       SettingsService.Set("BigOnLeft", _bigOnLeft.ToString().ToLower());
@@ -131,6 +132,21 @@
       SettingsService.Set("Custom_Background", _customBackground);
       SettingsService.Set("Custom_Surface", _customSurface);
 
+      await PersistSplashThemeAsync();
+
       MudDialog.Close(DialogResult.Ok(true));
+   }
+
+   private async Task PersistSplashThemeAsync() {
+      var isDark = _appearance != "Light";
+      var theme = _themeName switch {
+         "Blue" => Themes.Blue,
+         "Solarized" => Themes.Solarized,
+         "Green" => Themes.Green,
+         "Custom" => Themes.CreateCustomTheme(_customPrimary, _customSecondary, _customBackground, _customSurface),
+         _ => Themes.OneDarkPro
+      };
+      var (primary, background) = Themes.GetColors(theme, isDark);
+      await ThemeStore.PersistAsync(primary, background, isDark);
    }
 }

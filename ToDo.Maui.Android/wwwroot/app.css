@@ -4,6 +4,5 @@ body,
     height: 100%;
     margin: 0;
     font-family: 'Roboto', Helvetica, Arial, sans-serif;
-    background-color: var(--mud-palette-background);
     color: var(--mud-palette-text-primary);
 }
