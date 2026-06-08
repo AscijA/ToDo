@@ -83,6 +83,82 @@ public sealed record SyncPingResponse(
     string DeviceName,
     DateTimeOffset ServerTime);
 
+public sealed record SyncSnapshotRequest(
+    string DeviceId,
+    string TrustToken);
+
+public sealed record SyncSnapshotResponse(
+    string DeviceId,
+    string DeviceName,
+    string ProtocolVersion,
+    DateTimeOffset CreatedAt,
+    IReadOnlyList<SyncTaskDefinitionSnapshot> TaskDefinitions,
+    IReadOnlyList<SyncTaskListSnapshot> TaskLists,
+    IReadOnlyList<SyncTaskListItemSnapshot> TaskListItems,
+    IReadOnlyList<SyncDailyOccurrenceSnapshot> DailyOccurrences,
+    IReadOnlyList<SyncWeeklyOccurrenceSnapshot> WeeklyOccurrences,
+    IReadOnlyList<SyncMonthlyOccurrenceSnapshot> MonthlyOccurrences);
+
+public sealed record SyncPreviewSummary(
+    string DeviceName,
+    DateTimeOffset CreatedAt,
+    IReadOnlyList<SyncEntityPreviewCount> EntityCounts) {
+    public int NewCount => EntityCounts.Sum(count => count.NewCount);
+    public int MatchingCount => EntityCounts.Sum(count => count.MatchingCount);
+    public int ChangedCount => EntityCounts.Sum(count => count.ChangedCount);
+    public int LocalOnlyCount => EntityCounts.Sum(count => count.LocalOnlyCount);
+}
+
+public sealed record SyncEntityPreviewCount(
+    string Name,
+    int NewCount,
+    int MatchingCount,
+    int ChangedCount,
+    int LocalOnlyCount);
+
+public sealed record SyncTaskDefinitionSnapshot(
+    Guid Id,
+    string Title,
+    string Description);
+
+public sealed record SyncTaskListSnapshot(
+    Guid Id,
+    string Name,
+    string Color,
+    string? Description);
+
+public sealed record SyncTaskListItemSnapshot(
+    Guid Id,
+    Guid TaskDefinitionId,
+    Guid TaskListId,
+    bool IsDone,
+    int Position);
+
+public sealed record SyncDailyOccurrenceSnapshot(
+    Guid Id,
+    Guid TaskDefinitionId,
+    Guid DailyPlanId,
+    DateOnly Date,
+    bool IsDone,
+    string? Timeslot,
+    int SortOrder);
+
+public sealed record SyncWeeklyOccurrenceSnapshot(
+    Guid Id,
+    Guid TaskDefinitionId,
+    Guid WeeklyPlanId,
+    DateOnly WeekStart,
+    bool IsDone,
+    DayOfWeek? DayOfWeek);
+
+public sealed record SyncMonthlyOccurrenceSnapshot(
+    Guid Id,
+    Guid TaskDefinitionId,
+    Guid MonthlyPlanId,
+    DateOnly MonthStart,
+    bool IsDone,
+    int? DayOfMonth);
+
 public sealed record IncomingPairingRequest(
     string SessionId,
     string DeviceId,

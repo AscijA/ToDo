@@ -14,6 +14,7 @@ public sealed class LocalHttpSyncTransportService : ISyncTransportService {
 
     private readonly object gate = new();
     private readonly ISettingsService settings;
+    private readonly ISyncSnapshotService snapshotService;
     private readonly Dictionary<string, PendingPairing> pendingPairings = new(StringComparer.OrdinalIgnoreCase);
     private TcpListener? listener;
     private CancellationTokenSource? listenerCancellation;
@@ -21,8 +22,9 @@ public sealed class LocalHttpSyncTransportService : ISyncTransportService {
     private SyncDeviceIdentity? currentIdentity;
     private SyncTransportStatus status = new(false, null, null, null, null);
 
-    public LocalHttpSyncTransportService(ISettingsService settings) {
+    public LocalHttpSyncTransportService(ISettingsService settings, ISyncSnapshotService snapshotService) {
         this.settings = settings;
+        this.snapshotService = snapshotService;
     }
 
     public SyncTransportStatus GetStatus() {
@@ -196,6 +198,13 @@ public sealed class LocalHttpSyncTransportService : ISyncTransportService {
             return;
         }
 
+        if (string.Equals(method, "POST", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(path, "/sync/snapshot", StringComparison.OrdinalIgnoreCase)) {
+            var body = await ReadBodyAsync(reader, cancellationToken);
+            await HandleSnapshotAsync(stream, body, cancellationToken);
+            return;
+        }
+
         if (!string.Equals(method, "GET", StringComparison.OrdinalIgnoreCase) && !string.Equals(method, "POST", StringComparison.OrdinalIgnoreCase)) {
             await WriteResponseAsync(stream, 405, "Method Not Allowed", "text/plain", "Method not allowed", cancellationToken);
             return;
@@ -326,21 +335,54 @@ public sealed class LocalHttpSyncTransportService : ISyncTransportService {
             return;
         }
 
-        var pairedDevice = LoadPairedDevices()
-            .FirstOrDefault(device => string.Equals(device.DeviceId, request.DeviceId, StringComparison.OrdinalIgnoreCase));
-
-        if (pairedDevice == null) {
-            await WriteResponseAsync(stream, 401, "Unauthorized", "text/plain", "Device is not paired", cancellationToken);
-            return;
-        }
-
-        if (!string.Equals(pairedDevice.TrustToken, request.TrustToken, StringComparison.Ordinal)) {
-            await WriteResponseAsync(stream, 403, "Forbidden", "text/plain", "Invalid trust token", cancellationToken);
+        if (!await TryAuthorizePairedDeviceAsync(stream, request.DeviceId, request.TrustToken, cancellationToken)) {
             return;
         }
 
         var response = new SyncPingResponse(identity.DeviceId, identity.DeviceName, DateTimeOffset.Now);
         await WriteJsonResponseAsync(stream, response, cancellationToken);
+    }
+
+    private async Task HandleSnapshotAsync(NetworkStream stream, string body, CancellationToken cancellationToken) {
+        var identity = currentIdentity;
+        if (identity == null) {
+            await WriteResponseAsync(stream, 503, "Service Unavailable", "text/plain", "Sync is not available", cancellationToken);
+            return;
+        }
+
+        var request = DeserializeBody<SyncSnapshotRequest>(body);
+        if (request == null || string.IsNullOrWhiteSpace(request.DeviceId) || string.IsNullOrWhiteSpace(request.TrustToken)) {
+            await WriteResponseAsync(stream, 400, "Bad Request", "text/plain", "Invalid snapshot request", cancellationToken);
+            return;
+        }
+
+        if (!await TryAuthorizePairedDeviceAsync(stream, request.DeviceId, request.TrustToken, cancellationToken)) {
+            return;
+        }
+
+        var snapshot = await snapshotService.CreateSnapshotAsync(identity, cancellationToken);
+        await WriteJsonResponseAsync(stream, snapshot, cancellationToken);
+    }
+
+    private async Task<bool> TryAuthorizePairedDeviceAsync(
+        NetworkStream stream,
+        string deviceId,
+        string trustToken,
+        CancellationToken cancellationToken) {
+        var pairedDevice = LoadPairedDevices()
+            .FirstOrDefault(device => string.Equals(device.DeviceId, deviceId, StringComparison.OrdinalIgnoreCase));
+
+        if (pairedDevice == null) {
+            await WriteResponseAsync(stream, 401, "Unauthorized", "text/plain", "Device is not paired", cancellationToken);
+            return false;
+        }
+
+        if (!string.Equals(pairedDevice.TrustToken, trustToken, StringComparison.Ordinal)) {
+            await WriteResponseAsync(stream, 403, "Forbidden", "text/plain", "Invalid trust token", cancellationToken);
+            return false;
+        }
+
+        return true;
     }
 
     private async Task<string> ReadBodyAsync(StreamReader reader, CancellationToken cancellationToken) {

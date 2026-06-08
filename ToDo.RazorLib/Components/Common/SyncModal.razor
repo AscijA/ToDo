@@ -177,6 +177,30 @@
 												<span>Ping</span>
 											}
 										</MudButton>
+										<MudButton Size="Size.Small"
+													 Color="Color.Primary"
+													 Variant="Variant.Text"
+													 Disabled="@(_snapshotDeviceId == device.DeviceId)"
+													 OnClick="@(() => FetchSnapshot(device))">
+											@if (_snapshotDeviceId == device.DeviceId) {
+												<MudProgressCircular Size="Size.Small" Indeterminate="true" />
+											}
+											else {
+												<span>Snapshot</span>
+											}
+										</MudButton>
+										<MudButton Size="Size.Small"
+													 Color="Color.Primary"
+													 Variant="Variant.Text"
+													 Disabled="@(_previewDeviceId == device.DeviceId)"
+													 OnClick="@(() => PreviewSync(device))">
+											@if (_previewDeviceId == device.DeviceId) {
+												<MudProgressCircular Size="Size.Small" Indeterminate="true" />
+											}
+											else {
+												<span>Preview</span>
+											}
+										</MudButton>
 										<MudIconButton Icon="@Icons.Material.Filled.Delete"
 															aria-label="Remove paired device"
 															Size="Size.Small"
@@ -190,6 +214,12 @@
 				</MudPaper>
 				@if (!string.IsNullOrWhiteSpace(_pingMessage)) {
 					<MudAlert Severity="@_pingSeverity" Dense="true">@_pingMessage</MudAlert>
+				}
+				@if (!string.IsNullOrWhiteSpace(_snapshotMessage)) {
+					<MudAlert Severity="@_snapshotSeverity" Dense="true">@_snapshotMessage</MudAlert>
+				}
+				@if (!string.IsNullOrWhiteSpace(_previewMessage)) {
+					<MudAlert Severity="@_previewSeverity" Dense="true">@_previewMessage</MudAlert>
 				}
 			</MudStack>
 		</div>
@@ -219,6 +249,12 @@
 	private string? _pingMessage;
 	private Severity _pingSeverity = Severity.Info;
 	private string? _pingingDeviceId;
+	private string? _snapshotMessage;
+	private Severity _snapshotSeverity = Severity.Info;
+	private string? _snapshotDeviceId;
+	private string? _previewMessage;
+	private Severity _previewSeverity = Severity.Info;
+	private string? _previewDeviceId;
 	private PeriodicTimer? _incomingPairingTimer;
 	private CancellationTokenSource? _incomingPairingTimerCancellation;
 	private bool _isDiscovering;
@@ -404,6 +440,42 @@
 		}
 	}
 
+	private async Task FetchSnapshot(PairedSyncDevice device) {
+		_snapshotMessage = null;
+		_snapshotDeviceId = device.DeviceId;
+
+		try {
+			var snapshot = await SyncService.FetchSnapshotAsync(device);
+			_snapshotSeverity = Severity.Success;
+			_snapshotMessage = $"{snapshot.DeviceName} snapshot: {snapshot.TaskLists.Count} lists, {snapshot.TaskListItems.Count} list items, {snapshot.DailyOccurrences.Count + snapshot.WeeklyOccurrences.Count + snapshot.MonthlyOccurrences.Count} planner items.";
+		}
+		catch (Exception ex) {
+			_snapshotSeverity = Severity.Warning;
+			_snapshotMessage = ex.Message;
+		}
+		finally {
+			_snapshotDeviceId = null;
+		}
+	}
+
+	private async Task PreviewSync(PairedSyncDevice device) {
+		_previewMessage = null;
+		_previewDeviceId = device.DeviceId;
+
+		try {
+			var preview = await SyncService.PreviewSyncAsync(device);
+			_previewSeverity = preview.ChangedCount == 0 ? Severity.Success : Severity.Warning;
+			_previewMessage = FormatPreviewMessage(preview);
+		}
+		catch (Exception ex) {
+			_previewSeverity = Severity.Warning;
+			_previewMessage = ex.Message;
+		}
+		finally {
+			_previewDeviceId = null;
+		}
+	}
+
 	private void ApproveIncomingPairing(string sessionId) {
 		SyncTransportService.ApproveIncomingPairing(sessionId);
 		RefreshIncomingPairingRequests();
@@ -452,6 +524,19 @@
 
 	private static string NormalizePairingCode(string code) {
 		return new string(code.Where(char.IsDigit).ToArray());
+	}
+
+	private static string FormatPreviewMessage(SyncPreviewSummary preview) {
+		var changedDetails = preview.EntityCounts
+			.Where(count => count.NewCount > 0 || count.ChangedCount > 0 || count.LocalOnlyCount > 0)
+			.Select(count => $"{count.Name}: +{count.NewCount}, changed {count.ChangedCount}, local-only {count.LocalOnlyCount}");
+
+		var details = string.Join("; ", changedDetails);
+		if (string.IsNullOrWhiteSpace(details)) {
+			details = "no remote changes found";
+		}
+
+		return $"{preview.DeviceName} preview: {preview.NewCount} new, {preview.MatchingCount} matching, {preview.ChangedCount} changed, {preview.LocalOnlyCount} local-only. {details}.";
 	}
 
 	private string GetDiscoveryMessage() {

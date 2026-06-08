@@ -10,10 +10,15 @@ public sealed class LocalSyncService : ISyncService {
 
     private readonly ISettingsService settings;
     private readonly ISyncDiscoveryService discoveryService;
+    private readonly ISyncSnapshotService snapshotService;
 
-    public LocalSyncService(ISettingsService settings, ISyncDiscoveryService discoveryService) {
+    public LocalSyncService(
+        ISettingsService settings,
+        ISyncDiscoveryService discoveryService,
+        ISyncSnapshotService snapshotService) {
         this.settings = settings;
         this.discoveryService = discoveryService;
+        this.snapshotService = snapshotService;
     }
 
     public SyncDeviceIdentity GetLocalDevice() {
@@ -175,6 +180,39 @@ public sealed class LocalSyncService : ISyncService {
         return onlineDevice;
     }
 
+    public async Task<SyncSnapshotResponse> FetchSnapshotAsync(
+        PairedSyncDevice device,
+        CancellationToken cancellationToken = default) {
+        var localDevice = GetLocalDevice();
+        using var httpClient = CreatePairingClient();
+        var response = await PostJsonAsync(
+            httpClient,
+            $"http://{device.Address}/sync/snapshot",
+            new SyncSnapshotRequest(localDevice.DeviceId, device.TrustToken),
+            cancellationToken);
+
+        if (!response.IsSuccessStatusCode) {
+            var error = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new InvalidOperationException($"Snapshot fetch failed: {(int)response.StatusCode} {response.ReasonPhrase}. {error}");
+        }
+
+        var snapshot = await response.Content.ReadFromJsonAsync<SyncSnapshotResponse>(cancellationToken);
+        if (snapshot == null || !string.Equals(snapshot.DeviceId, device.DeviceId, StringComparison.OrdinalIgnoreCase)) {
+            throw new InvalidOperationException("Snapshot returned an invalid device identity.");
+        }
+
+        return snapshot;
+    }
+
+    public async Task<SyncPreviewSummary> PreviewSyncAsync(
+        PairedSyncDevice device,
+        CancellationToken cancellationToken = default) {
+        var remoteSnapshot = await FetchSnapshotAsync(device, cancellationToken);
+        var localSnapshot = await snapshotService.CreateSnapshotAsync(GetLocalDevice(), cancellationToken);
+
+        return CreatePreviewSummary(remoteSnapshot, localSnapshot);
+    }
+
     public void RemovePairedDevice(string deviceId) {
         var devices = LoadPairedDevices()
             .Where(device => !string.Equals(device.DeviceId, deviceId, StringComparison.OrdinalIgnoreCase))
@@ -218,6 +256,76 @@ public sealed class LocalSyncService : ISyncService {
         Span<byte> bytes = stackalloc byte[32];
         RandomNumberGenerator.Fill(bytes);
         return Convert.ToBase64String(bytes);
+    }
+
+    private static SyncPreviewSummary CreatePreviewSummary(
+        SyncSnapshotResponse remoteSnapshot,
+        SyncSnapshotResponse localSnapshot) {
+        return new SyncPreviewSummary(
+            remoteSnapshot.DeviceName,
+            remoteSnapshot.CreatedAt,
+            [
+                CompareEntities(
+                    "task definitions",
+                    remoteSnapshot.TaskDefinitions,
+                    localSnapshot.TaskDefinitions,
+                    snapshot => snapshot.Id),
+                CompareEntities(
+                    "task lists",
+                    remoteSnapshot.TaskLists,
+                    localSnapshot.TaskLists,
+                    snapshot => snapshot.Id),
+                CompareEntities(
+                    "task list items",
+                    remoteSnapshot.TaskListItems,
+                    localSnapshot.TaskListItems,
+                    snapshot => snapshot.Id),
+                CompareEntities(
+                    "daily planner items",
+                    remoteSnapshot.DailyOccurrences,
+                    localSnapshot.DailyOccurrences,
+                    snapshot => snapshot.Id),
+                CompareEntities(
+                    "weekly planner items",
+                    remoteSnapshot.WeeklyOccurrences,
+                    localSnapshot.WeeklyOccurrences,
+                    snapshot => snapshot.Id),
+                CompareEntities(
+                    "monthly planner items",
+                    remoteSnapshot.MonthlyOccurrences,
+                    localSnapshot.MonthlyOccurrences,
+                    snapshot => snapshot.Id)
+            ]);
+    }
+
+    private static SyncEntityPreviewCount CompareEntities<T>(
+        string name,
+        IReadOnlyList<T> remoteItems,
+        IReadOnlyList<T> localItems,
+        Func<T, Guid> getId) {
+        var localById = localItems.ToDictionary(getId);
+        var remoteIds = remoteItems.Select(getId).ToHashSet();
+        var newCount = 0;
+        var matchingCount = 0;
+        var changedCount = 0;
+
+        foreach (var remoteItem in remoteItems) {
+            var id = getId(remoteItem);
+            if (!localById.TryGetValue(id, out var localItem)) {
+                newCount++;
+                continue;
+            }
+
+            if (EqualityComparer<T>.Default.Equals(remoteItem, localItem)) {
+                matchingCount++;
+            }
+            else {
+                changedCount++;
+            }
+        }
+
+        var localOnlyCount = localItems.Count(localItem => !remoteIds.Contains(getId(localItem)));
+        return new SyncEntityPreviewCount(name, newCount, matchingCount, changedCount, localOnlyCount);
     }
 
     private static HttpClient CreatePairingClient() {
