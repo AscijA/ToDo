@@ -1,0 +1,27 @@
+<div class="mobile-page-header">
+   @if (ShowBackButton) {
+      <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
+                     aria-label="Back"
+                     Color="Color.Primary"
+                     Size="Size.Small"
+                     OnClick="OnBack" />
+   }
+   else if (!string.IsNullOrEmpty(Icon)) {
+      <MudIconButton Icon="@Icon" Size="Size.Small" Color="Color.Secondary" OnClick="() => { }" Ripple="false"/>
+   }
+   <MudText Typo="Typo.h6">@Title</MudText>
+</div>
+
+@code {
+   [Parameter]
+   public string Title { get; set; } = string.Empty;
+
+   [Parameter]
+   public bool ShowBackButton { get; set; }
+
+   [Parameter]
+   public string? Icon { get; set; }
+
+   [Parameter]
+   public EventCallback OnBack { get; set; }
+}

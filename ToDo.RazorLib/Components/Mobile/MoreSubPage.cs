@@ -1,6 +1,6 @@
 namespace ToDo.RazorLib.Components.Mobile;
 
-public enum MobileMorePage {
+public enum MoreSubPage {
     None,
     Sync,
     Settings,

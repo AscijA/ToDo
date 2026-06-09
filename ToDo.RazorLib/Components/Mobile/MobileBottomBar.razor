@@ -22,9 +22,13 @@
     </button>
     <button class="tab-btn @(ActiveTab == 3 ? "active" : "")" @onclick="() => OnTabSelected.InvokeAsync(3)" style="@ListTabStyle">
         <span class="tab-btn-icon">
-            <span class="tab-list-letter">@ListLetter</span>
+            @if (string.IsNullOrEmpty(ListLetter)) {
+                <MudIcon Icon="@Icons.Material.Filled.Checklist" Size="Size.Small" />
+            } else {
+                <span class="tab-list-letter">@ListLetter</span>
+            }
         </span>
-        <span class="tab-btn-label">Lists</span>
+        <span class="tab-btn-label">@(string.IsNullOrEmpty(ListName) ? "Lists" : ListName)</span>
     </button>
     <button class="tab-btn @(ActiveTab == 4 ? "active" : "")" @onclick="() => OnTabSelected.InvokeAsync(4)">
         <span class="tab-btn-icon">
@@ -39,7 +43,10 @@
     public int ActiveTab { get; set; }
 
     [Parameter]
-    public string ListLetter { get; set; } = "L";
+    public string ListLetter { get; set; } = string.Empty;
+
+    [Parameter]
+    public string ListName { get; set; } = string.Empty;
 
     [Parameter]
     public string ListTabStyle { get; set; } = string.Empty;

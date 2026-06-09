@@ -1,0 +1,28 @@
+@inject ISyncService SyncService
+
+<MobilePageHeader Title="@_deviceName"
+                  Icon="@Icons.Material.Filled.PhoneAndroid" />
+<MudList T="MoreSubPage" Dense="false">
+   <MudDivider />
+   <MudListItem Icon="@Icons.Material.Filled.Sync"
+                IconColor="Color.Primary"
+                Text="Sync"
+                OnClick="@(() => OnPageSelected.InvokeAsync(MoreSubPage.Sync))" />
+   <MudListItem Icon="@Icons.Material.Filled.Settings"
+                IconColor="Color.Primary"
+                Text="Settings"
+                OnClick="@(() => OnPageSelected.InvokeAsync(MoreSubPage.Settings))" />
+   <MudListItem Icon="@Icons.Material.Filled.Info"
+                IconColor="Color.Primary"
+                Text="About"
+                OnClick="@(() => OnPageSelected.InvokeAsync(MoreSubPage.About))" />
+</MudList>
+
+@code {
+   [Parameter]
+   public EventCallback<MoreSubPage> OnPageSelected { get; set; }
+   private string _deviceName = string.Empty;
+   protected override void OnInitialized() {
+      _deviceName = SyncService.GetLocalDevice().DeviceName;
+   }
+}

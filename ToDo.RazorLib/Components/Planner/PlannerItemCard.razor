@@ -1,192 +1,190 @@
 @using ToDo.Application.Contracts.DTOs
 
-<MudForm Model="@Item" ReadOnly="ReadOnly" Style="@GetItemStyle()">
-	<div class="d-flex align-center gap-4">
-		<MudCheckBox @bind-Value="Item.IsDone"
-						 @bind-Value:after="InvokeTitleChangedAsync"
-						 Color="Color.Primary"
-						 Dense="true"
-						 Size="Size.Small" />
+<MudForm Model="@Item" ReadOnly="ReadOnly" Class="@GetItemClass()" Style="@GetItemStyle()">
+   <div class="d-flex align-center gap-4">
+      <MudCheckBox @bind-Value="Item.IsDone"
+                   @bind-Value:after="InvokeTitleChangedAsync"
+                   Color="Color.Primary"
+                   Dense="true"
+                   Size="Size.Small" />
 
-		@if (Schedule != null) {
-			<div class="planner-schedule-slot @ScheduleClass" style="@GetScheduleStyle()">
-				@Schedule
-			</div>
-		}
+      @if (Schedule != null) {
+         <div class="planner-schedule-slot @ScheduleClass">
+            @Schedule
+         </div>
+      }
 
-		<MudTextField @bind-Value="Item.Title"
-					  @bind-Value:after="InvokeTitleChangedAsync"
-					  @ref="titleRef"
-					  Label=""
-					  Margin="Margin.Dense"
-					  Underline="@(string.IsNullOrWhiteSpace(Item.Title))"
-					  Class="@(Item.IsDone ? "done-item" : string.Empty)" />
+      <MudTextField @bind-Value="Item.Title"
+                    @bind-Value:after="InvokeTitleChangedAsync"
+                    @ref="titleRef"
+                    Label=""
+                    Margin="Margin.Dense"
+                    Underline="@(string.IsNullOrWhiteSpace(Item.Title))"
+                    Class="@(Item.IsDone ? "done-item" : string.Empty)" />
 
-		<MudIconButton Icon="@Icons.Material.Filled.Info"
-						 Color="Color.Primary"
-						 Size="Size.Small"
-						 OnClick="OnToggleExpanded" />
+      <MudIconButton Icon="@Icons.Material.Filled.Info"
+                     Color="Color.Primary"
+                     Size="Size.Small"
+                     OnClick="OnToggleExpanded" />
 
-		<MudIconButton Icon="@Icons.Material.Filled.Delete"
-						 Color="Color.Error"
-						 Size="Size.Small"
-						 OnClick="OnDeleteClick" />
-	</div>
+      <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                     Color="Color.Error"
+                     Size="Size.Small"
+                     OnClick="OnDeleteClick" />
+   </div>
 
-	<MudCollapse @bind-Expanded="_expanded">
-		<MudTextField @bind-Value="Item.Description"
-					  @bind-Value:after="InvokeTitleChangedAsync"
-					  Margin="Margin.Dense"
-					  Lines="1" />
-	</MudCollapse>
+   <MudCollapse @bind-Expanded="_expanded">
+      <MudTextField @bind-Value="Item.Description"
+                    @bind-Value:after="InvokeTitleChangedAsync"
+                    Margin="Margin.Dense"
+                    Lines="1" />
+   </MudCollapse>
 </MudForm>
 
 @code {
-	[Parameter]
-	public PlannerItemDTO Item { get; set; } = new();
+   [Parameter]
+   public PlannerItemDTO Item { get; set; } = new();
 
-	[Parameter]
-	public RenderFragment? Schedule { get; set; }
+   [Parameter]
+   public RenderFragment? Schedule { get; set; }
 
-	[Parameter]
-	public string? ScheduleClass { get; set; }
+   [Parameter]
+   public string? ScheduleClass { get; set; }
 
-	[Parameter]
-	public bool ReadOnly { get; set; }
+   [Parameter]
+   public bool ReadOnly { get; set; }
 
-	[Parameter]
-	public bool AutoFocus { get; set; }
+   [Parameter]
+   public bool AutoFocus { get; set; }
 
-	[Parameter]
-	public EventCallback<MouseEventArgs> OnDelete { get; set; }
+   [Parameter]
+   public EventCallback<MouseEventArgs> OnDelete { get; set; }
 
-	[Parameter]
-	public EventCallback OnTitleChanged { get; set; }
+   [Parameter]
+   public EventCallback OnTitleChanged { get; set; }
 
-	private MudTextField<string>? titleRef;
-	private bool _expanded;
+   private MudTextField<string>? titleRef;
+   private bool _expanded;
 
-	protected override async Task OnAfterRenderAsync(bool firstRender) {
-		if (firstRender && Item.TaskDefinitionId == Guid.Empty && AutoFocus) {
-			await (titleRef?.FocusAsync().AsTask() ?? Task.CompletedTask);
-		}
-	}
+   protected override async Task OnAfterRenderAsync(bool firstRender) {
+      if (firstRender && Item.TaskDefinitionId == Guid.Empty && AutoFocus) {
+         await (titleRef?.FocusAsync().AsTask() ?? Task.CompletedTask);
+      }
+   }
 
-	private void OnToggleExpanded() {
-		_expanded = !_expanded;
-	}
+   private void OnToggleExpanded() {
+      _expanded = !_expanded;
+   }
 
-	private async Task OnDeleteClick() {
-		await OnDelete.InvokeAsync(new MouseEventArgs());
-	}
+   private async Task OnDeleteClick() {
+      await OnDelete.InvokeAsync(new MouseEventArgs());
+   }
 
-	private async Task InvokeTitleChangedAsync() {
-		await OnTitleChanged.InvokeAsync();
-	}
+   private async Task InvokeTitleChangedAsync() {
+      await OnTitleChanged.InvokeAsync();
+   }
 
-	private string GetItemStyle() {
-		var tint = GetAccentTint(Item.Color);
-		if (tint == null) {
-			return string.Empty;
-		}
+   private string GetItemClass() {
+      return GetAccentTint(Item.Color) != null ? "planner-item-tinted" : string.Empty;
+   }
 
-		return $"background-color: {tint}; border-radius: 4px; padding: 0 6px; margin: 0 -6px;";
-	}
+   private string GetItemStyle() {
+      var tint = GetAccentTint(Item.Color);
+      if (tint == null) {
+         return string.Empty;
+      }
 
-	private string? GetScheduleStyle() {
-		return ScheduleClass == "weekly-schedule-slot"
-			? "flex: 0 0 75px; width: 75px; max-width: 75px; overflow: hidden;"
-			: null;
-	}
+      return $"background-color: {tint};";
+   }
 
-	private static string? GetAccentTint(string? color) {
-		if (!TryGetRgb(color, out var r, out var g, out var b)) {
-			return null;
-		}
+   private static string? GetAccentTint(string? color) {
+      if (!TryGetRgb(color, out var r, out var g, out var b)) {
+         return null;
+      }
 
-		return $"rgba({r}, {g}, {b}, .12)";
-	}
+      return $"rgba({r}, {g}, {b}, .12)";
+   }
 
-	private static bool TryGetRgb(string? color, out int r, out int g, out int b) {
-		r = g = b = 0;
+   private static bool TryGetRgb(string? color, out int r, out int g, out int b) {
+      r = g = b = 0;
 
-		if (string.IsNullOrWhiteSpace(color)) {
-			return false;
-		}
+      if (string.IsNullOrWhiteSpace(color)) {
+         return false;
+      }
 
-		var value = color.Trim();
-		if (value.StartsWith('#')) {
-			return TryGetHexRgb(value, out r, out g, out b);
-		}
+      var value = color.Trim();
+      if (value.StartsWith('#')) {
+         return TryGetHexRgb(value, out r, out g, out b);
+      }
 
-		return TryGetCssRgb(value, out r, out g, out b);
-	}
+      return TryGetCssRgb(value, out r, out g, out b);
+   }
 
-	private static bool TryGetHexRgb(string color, out int r, out int g, out int b) {
-		r = g = b = 0;
+   private static bool TryGetHexRgb(string color, out int r, out int g, out int b) {
+      r = g = b = 0;
 
-		var hex = color[1..];
-		if (hex.Length == 3) {
-			hex = string.Concat(hex.Select(c => $"{c}{c}"));
-		}
-		else if (hex.Length == 4) {
-			hex = string.Concat(hex.Take(3).Select(c => $"{c}{c}"));
-		}
-		else if (hex.Length == 8) {
-			hex = hex[..6];
-		}
+      var hex = color[1..];
+      if (hex.Length == 3) {
+         hex = string.Concat(hex.Select(c => $"{c}{c}"));
+      }
+      else if (hex.Length == 4) {
+         hex = string.Concat(hex.Take(3).Select(c => $"{c}{c}"));
+      }
+      else if (hex.Length == 8) {
+         hex = hex[..6];
+      }
 
-		if (hex.Length != 6 || !int.TryParse(hex, System.Globalization.NumberStyles.HexNumber, null, out var value)) {
-			return false;
-		}
+      if (hex.Length != 6 || !int.TryParse(hex, System.Globalization.NumberStyles.HexNumber, null, out var value)) {
+         return false;
+      }
 
-		r = (value >> 16) & 0xff;
-		g = (value >> 8) & 0xff;
-		b = value & 0xff;
-		return true;
-	}
+      r = (value >> 16) & 0xff;
+      g = (value >> 8) & 0xff;
+      b = value & 0xff;
+      return true;
+   }
 
-	private static bool TryGetCssRgb(string color, out int r, out int g, out int b) {
-		r = g = b = 0;
+   private static bool TryGetCssRgb(string color, out int r, out int g, out int b) {
+      r = g = b = 0;
 
-		if (!color.StartsWith("rgb", StringComparison.OrdinalIgnoreCase)) {
-			return false;
-		}
+      if (!color.StartsWith("rgb", StringComparison.OrdinalIgnoreCase)) {
+         return false;
+      }
 
-		var start = color.IndexOf('(');
-		var end = color.IndexOf(')', start + 1);
-		if (start < 0 || end <= start) {
-			return false;
-		}
+      var start = color.IndexOf('(');
+      var end = color.IndexOf(')', start + 1);
+      if (start < 0 || end <= start) {
+         return false;
+      }
 
-		var channels = color[(start + 1)..end]
-			.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-		if (channels.Length < 3) {
-			return false;
-		}
+      var channels = color[(start + 1)..end]
+         .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+      if (channels.Length < 3) {
+         return false;
+      }
 
-		return TryGetCssChannel(channels[0], out r)
-			&& TryGetCssChannel(channels[1], out g)
-			&& TryGetCssChannel(channels[2], out b);
-	}
+      return TryGetCssChannel(channels[0], out r)
+         && TryGetCssChannel(channels[1], out g)
+         && TryGetCssChannel(channels[2], out b);
+   }
 
-	private static bool TryGetCssChannel(string channel, out int value) {
-		value = 0;
+   private static bool TryGetCssChannel(string channel, out int value) {
+      value = 0;
 
-		if (channel.EndsWith('%')) {
-			if (!double.TryParse(channel[..^1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var percent)) {
-				return false;
-			}
+      if (channel.EndsWith('%')) {
+         if (!double.TryParse(channel[..^1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var percent)) {
+            return false;
+         }
 
-			value = (int)Math.Round(Math.Clamp(percent, 0, 100) * 255 / 100);
-			return true;
-		}
+         value = (int)Math.Round(Math.Clamp(percent, 0, 100) * 255 / 100);
+         return true;
+      }
 
-		if (!double.TryParse(channel, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var numeric)) {
-			return false;
-		}
+      if (!double.TryParse(channel, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var numeric)) {
+         return false;
+      }
 
-		value = (int)Math.Round(Math.Clamp(numeric, 0, 255));
-		return true;
-	}
+      value = (int)Math.Round(Math.Clamp(numeric, 0, 255));
+      return true;
+   }
 }

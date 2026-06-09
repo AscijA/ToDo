@@ -1,7 +1,0 @@
-::deep .done-item  {
-   text-decoration: line-through;
-   opacity: .6;
-}
-::deep .timeslot .mud-input-control-helper-container {
-   display: none !important;
-}

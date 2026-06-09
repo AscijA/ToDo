@@ -1,19 +1,61 @@
+::deep .planner-item-tinted {
+   border-radius: 4px;
+   padding: 0 6px;
+   margin: 0 -6px;
+}
+
 ::deep .planner-schedule-slot {
    flex: 0 0 auto;
    min-width: 0;
 }
 
 ::deep .planner-schedule-slot.weekly-schedule-slot {
-   flex-basis: 100px;
-   width: 100px;
-   max-width: 100px;
+   flex: 0 0 75px;
+   width: 75px;
+   max-width: 75px;
    overflow: hidden;
 }
 
 ::deep .planner-schedule-slot.weekly-schedule-slot .mud-input-control,
 ::deep .planner-schedule-slot.weekly-schedule-slot .mud-input,
 ::deep .planner-schedule-slot.weekly-schedule-slot .mud-select {
-   width: 100px !important;
-   min-width: 100px !important;
-   max-width: 100px !important;
+   width: 75px !important;
+   min-width: 75px !important;
+   max-width: 75px !important;
+}
+
+::deep .timeslot {
+   width: 5ch;
+   max-width: 5ch;
+   text-align: center;
+}
+
+::deep .timeslot .mud-input-control-helper-container {
+   display: none !important;
+}
+
+::deep .done-item {
+   text-decoration: line-through;
+   opacity: .6;
+}
+
+::deep .date {
+   width: 2ch;
+   max-width: 2ch;
+   text-align: center;
+}
+
+::deep .weekly-day-select {
+   flex: 0 0 68px !important;
+   width: 68px !important;
+   min-width: 68px !important;
+   max-width: 68px !important;
+}
+
+::deep .weekly-day-select .mud-input,
+::deep .weekly-day-select .mud-input-control,
+::deep .weekly-day-select .mud-select {
+   width: 68px !important;
+   min-width: 68px !important;
+   max-width: 68px !important;
 }

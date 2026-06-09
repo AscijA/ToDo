@@ -1,32 +1,13 @@
-.timeslot {
-   width: 5ch;
-   max-width: 5ch;
-   text-align: center;
-}
-
-.date {
-   width: 2ch;
-   max-width: 2ch;
-   text-align: center;
-}
-
-.title {
-   display: flex;
-   align-items: center;
-   justify-content: center;
-   padding: 4px 0;
-   flex-wrap: nowrap;
-   gap: 0;
-}
-
-.title .title-date {
-   margin: 0 8px;
-   font-size: 0.9rem;
-   font-weight: 500;
-   white-space: nowrap;
-   color: var(--mud-palette-text-primary);
-   cursor: pointer;
-   line-height: 1;
-   display: flex;
-   align-items: center;
+.panel-daily,
+.panel-weekly,
+.panel-monthly {
+    background-color: var(--mud-palette-surface);
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: 8px;
+    padding: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
 }

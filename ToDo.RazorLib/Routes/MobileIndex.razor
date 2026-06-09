@@ -34,7 +34,7 @@
                 <MonthlyPlanner />
                 break;
             case 3:
-                <MobileTaskListsView TaskLists="_taskLists"
+                <MobileTaskListsPage TaskLists="_taskLists"
                                      SelectedListId="_selectedListId"
                                      OnListSelected="SelectList"
                                      OnAddNewList="AddNewList"
@@ -42,7 +42,7 @@
                                      OnListsUpdated="LoadTaskLists" />
                 break;
             case 4:
-                <MobileMoreView SelectedPage="_morePage"
+                <MobileMoreContainer SelectedPage="_morePage"
                                 OnPageSelected="OpenMorePage"
                                 OnBack="CloseMorePage"
                                 OnSettingsSaved="OnSettingsSavedAsync" />
@@ -52,13 +52,14 @@
 
     <MobileBottomBar ActiveTab="_activeTab"
                      ListLetter="@GetSelectedListLetter()"
+                     ListName="@GetSelectedListName()"
                      ListTabStyle="@GetListTabColorVar()"
                      OnTabSelected="SetTab" />
 </div>
 
 @code {
     private int _activeTab = 0;
-    private MobileMorePage _morePage = MobileMorePage.None;
+    private MoreSubPage _morePage = MoreSubPage.None;
     private List<TaskListDto> _taskLists = new();
     private Guid _selectedListId = Guid.Empty;
 
@@ -99,7 +100,7 @@
         }
 
         if (index != 4) {
-            _morePage = MobileMorePage.None;
+            _morePage = MoreSubPage.None;
         }
 
         _activeTab = index;
@@ -176,17 +177,17 @@
     private void OnSyncModalRequested() {
         _ = InvokeAsync(() => {
             _activeTab = 4;
-            _morePage = MobileMorePage.Sync;
+            _morePage = MoreSubPage.Sync;
             StateHasChanged();
         });
     }
 
-    private void OpenMorePage(MobileMorePage page) {
+    private void OpenMorePage(MoreSubPage page) {
         _morePage = page;
     }
 
     private void CloseMorePage() {
-        _morePage = MobileMorePage.None;
+        _morePage = MoreSubPage.None;
     }
 
     private async Task OnSettingsSavedAsync() {
@@ -200,7 +201,12 @@
 
     private string GetSelectedListLetter() {
         var list = _taskLists.FirstOrDefault(l => l.Id == _selectedListId);
-        return list != null ? GetIconLetter(list.Name) : "L";
+        return list != null ? GetIconLetter(list.Name) : string.Empty;
+    }
+
+    private string GetSelectedListName() {
+        var list = _taskLists.FirstOrDefault(l => l.Id == _selectedListId);
+        return list?.Name ?? string.Empty;
     }
 
     private string GetListTabColorVar() {
@@ -210,7 +216,7 @@
     }
 
     private string GetMobileContentClass() {
-        return _activeTab == 4 && _morePage != MobileMorePage.None
+        return _activeTab == 4
             ? "mobile-content mobile-content-subpage"
             : "mobile-content";
     }

@@ -1,0 +1,38 @@
+<div class="mobile-subpage">
+   <MudPaper Class="panel-daily mud-height-full rounded mobile-page-wrapper" Elevation="1">
+      <div>
+         <MudStack Spacing="4">
+            @switch (SelectedPage) {
+               case MoreSubPage.None:
+                  <MobileMorePage OnPageSelected="OnPageSelected" />
+                  break;
+               case MoreSubPage.Sync:
+                  <SyncPage ShowBackButton="true" OnBack="OnBack" />
+                  break;
+               case MoreSubPage.Settings:
+                  <SettingsPage ShowBackButton="true" OnBack="OnBack" OnSaved="OnSettingsSaved" />
+                  break;
+               case MoreSubPage.About:
+                  <AboutPage ShowBackButton="true" OnBack="OnBack" />
+                  break;
+            }
+         </MudStack>
+      </div>
+   </MudPaper>
+</div>
+
+@code {
+   [Parameter]
+   public EventCallback<MoreSubPage> OnPageSelected { get; set; }
+
+   [Parameter]
+   public MoreSubPage SelectedPage { get; set; }
+
+   [Parameter]
+   public EventCallback OnBack { get; set; }
+
+   [Parameter]
+   public EventCallback OnSettingsSaved { get; set; }
+
+
+}
