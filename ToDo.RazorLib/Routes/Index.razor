@@ -1,192 +1,242 @@
 @page "/"
+@using Microsoft.JSInterop
 @using ToDo.RazorLib.Components.Desktop
-@using ToDo.RazorLib.Components.Layouts
 @using ToDo.RazorLib.Components.TaskList
-@using ToDo.RazorLib.Components.Common
 @using ToDo.Application.Contracts.DTOs
 @using ToDo.Application.Interfaces.Services
 @using ToDo.RazorLib.Services
 @inject ITaskListService ListService
 @inject IDialogService DialogService
 @inject ISettingsService SettingsService
+@inject IJSRuntime JSRuntime
 @inject SyncModalRequestService SyncModalRequests
 @inject ThemeStoreInterop ThemeStore
-@implements IDisposable
+@implements IAsyncDisposable
 
 <MudThemeProvider @ref="_mudThemeProvider"
-						Theme="_currentTheme"
-						@bind-IsDarkMode="_isDarkMode" />
+                  Theme="_currentTheme"
+                  @bind-IsDarkMode="_isDarkMode" />
 <MudDialogProvider />
 <MudSnackbarProvider />
 <MudPopoverProvider />
 <PageTitle>Planner Dashboard</PageTitle>
 
 <div class="planner-dashboard">
-	<DesktopSidebar TaskLists="taskLists"
-						 ActivePage="_activePage"
-						 SelectedListId="selectedListId"
-						 OnPlannerSelected="ShowPlanner"
-						 OnListSelected="SelectList"
-						 OnAddNewList="AddNewList"
-						 OnSyncSelected="OpenSync"
-						 OnSettingsSelected="OpenSettings" />
+   <DesktopSidebar @ref="_sidebar"
+                   TaskLists="taskLists"
+                   ActivePage="_activePage"
+                   SelectedListId="selectedListId"
+                   OnPlannerSelected="ShowPlanner"
+                   OnListSelected="SelectList"
+                   OnAddNewList="AddNewList"
+                   OnSyncSelected="OpenSync"
+                   OnSettingsSelected="OpenSettings"
+                   OnAboutSelected="OpenAbout" />
 
-	<div class="main-content mud-height-full">
-		@if (_activePage == DesktopPage.Planner) {
-			<Planner @key="_plannerKey" />
-		}
-		else if (_activePage == DesktopPage.List && selectedListId != Guid.Empty) {
-			<MudPaper Class="panel-daily mud-height-full rounded" Elevation="1">
-				<TaskList ListId="selectedListId"
-							 OnDeleted="OnListDeleted"
-							 OnUpdated="LoadTaskLists" />
-			</MudPaper>
-		}
-		else if (_activePage == DesktopPage.Sync) {
-			<SyncPage />
-		}
-		else if (_activePage == DesktopPage.Settings) {
-			<SettingsPage OnSaved="OnSettingsSavedAsync" />
-		}
-	</div>
+   <div class="main-content mud-height-full">
+      @if (_activePage == DesktopPage.Planner) {
+         <Planner @key="_plannerKey" />
+      }
+      else if (_activePage == DesktopPage.List && selectedListId != Guid.Empty) {
+         <MudPaper Class="panel-daily mud-height-full rounded" Elevation="1">
+            <TaskList ListId="selectedListId"
+                      OnDeleted="OnListDeleted"
+                      OnUpdated="LoadTaskLists" />
+         </MudPaper>
+      }
+      else if (_activePage == DesktopPage.Sync) {
+         <SyncPage />
+      }
+      else if (_activePage == DesktopPage.Settings) {
+         <SettingsPage OnSaved="OnSettingsSavedAsync" />
+      }
+      else if (_activePage == DesktopPage.About) {
+         <AboutPage />
+      }
+   </div>
 </div>
 
 @code {
-	private List<TaskListDto> taskLists = new();
-	private DesktopPage _activePage = DesktopPage.Planner;
-	private Guid selectedListId = Guid.Empty;
+   private List<TaskListDto> taskLists = new();
+   private DesktopPage _activePage = DesktopPage.Planner;
+   private Guid selectedListId = Guid.Empty;
 
-	private MudThemeProvider? _mudThemeProvider;
-	private string _appearance = "System";
-	private bool _isDarkMode = true;
-	private MudTheme _currentTheme = Themes.OneDarkPro;
-	private Guid _plannerKey = Guid.NewGuid();
+   private MudThemeProvider? _mudThemeProvider;
+   private DesktopSidebar? _sidebar;
+   private string _appearance = "System";
+   private bool _isDarkMode = true;
+   private MudTheme _currentTheme = Themes.OneDarkPro;
+   private Guid _plannerKey = Guid.NewGuid();
 
-	protected override async Task OnInitializedAsync() {
-		SyncModalRequests.OpenRequested += OnSyncModalRequested;
-		LoadSettings();
-		await LoadTaskLists();
-	}
+   private DotNetObjectReference<Index>? _dotNetRef;
+   private IJSObjectReference? _reorderModule;
+   private IJSObjectReference? _reorderInstance;
+   private bool _shouldAttachReorder;
 
-	protected override async Task OnAfterRenderAsync(bool firstRender) {
-		if (firstRender) {
-			if (_appearance == "System" && _mudThemeProvider != null) {
-				await _mudThemeProvider.WatchSystemDarkModeAsync(OnSystemDarkModeChanged);
-				var systemDarkMode = await _mudThemeProvider.GetSystemDarkModeAsync();
-				if (_isDarkMode != systemDarkMode) {
-					_isDarkMode = systemDarkMode;
-					StateHasChanged();
-				}
-			}
-			await PersistThemeAsync();
-		}
-	}
+   protected override async Task OnInitializedAsync() {
+      SyncModalRequests.OpenRequested += OnSyncModalRequested;
+      LoadSettings();
+      await LoadTaskLists();
+   }
 
-	private async Task PersistThemeAsync() {
-		var (primary, background) = Themes.GetColors(_currentTheme, _isDarkMode);
-		await ThemeStore.PersistAsync(primary, background, _isDarkMode);
-	}
+   protected override async Task OnAfterRenderAsync(bool firstRender) {
+      if (firstRender) {
+         if (_appearance == "System" && _mudThemeProvider != null) {
+            await _mudThemeProvider.WatchSystemDarkModeAsync(OnSystemDarkModeChanged);
+            var systemDarkMode = await _mudThemeProvider.GetSystemDarkModeAsync();
+            if (_isDarkMode != systemDarkMode) {
+               _isDarkMode = systemDarkMode;
+               StateHasChanged();
+            }
+         }
+         await PersistThemeAsync();
 
-	private void LoadSettings() {
-		_appearance = SettingsService.Get("Appearance", "System");
-		if (_appearance == "Light")
-			_isDarkMode = false;
-		else if (_appearance == "Dark")
-			_isDarkMode = true;
+         _dotNetRef = DotNetObjectReference.Create(this);
+         _reorderModule = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./_content/ToDo.RazorLib/tasklist-reorder.js");
+      }
 
-		var themeName = SettingsService.Get("Theme", "ODP");
+      if (_shouldAttachReorder && _reorderModule != null && _dotNetRef != null && _sidebar != null) {
+         _shouldAttachReorder = false;
+         if (_reorderInstance != null) {
+            await _reorderInstance.InvokeVoidAsync("dispose");
+            await _reorderInstance.DisposeAsync();
+         }
+         _reorderInstance = await _reorderModule.InvokeAsync<IJSObjectReference>("attachSortable", _sidebar.ListsContainer, _dotNetRef, ".sidebar-list-item", null);
+      }
+   }
 
-		if (themeName == "Custom") {
-			var primary = SettingsService.Get("Custom_Primary", "#C678DD");
-			var secondary = SettingsService.Get("Custom_Secondary", "#61AFEF");
-			var background = SettingsService.Get("Custom_Background", "#282C34");
-			var surface = SettingsService.Get("Custom_Surface", "#21252B");
-			_currentTheme = Themes.CreateCustomTheme(primary, secondary, background, surface);
-		}
-		else {
-			_currentTheme = themeName switch {
-				"Blue" => Themes.Blue,
-				"Solarized" => Themes.Solarized,
-				"Green" => Themes.Green,
-				_ => Themes.OneDarkPro
-			};
-		}
-	}
+   private async Task PersistThemeAsync() {
+      var (primary, background) = Themes.GetColors(_currentTheme, _isDarkMode);
+      await ThemeStore.PersistAsync(primary, background, _isDarkMode);
+   }
 
-	private Task OnSystemDarkModeChanged(bool isDarkMode) {
-		if (_appearance == "System") {
-			_isDarkMode = isDarkMode;
-			_ = PersistThemeAsync();
-			StateHasChanged();
-		}
-		return Task.CompletedTask;
-	}
+   private void LoadSettings() {
+      _appearance = SettingsService.Get("Appearance", "System");
+      if (_appearance == "Light")
+         _isDarkMode = false;
+      else if (_appearance == "Dark")
+         _isDarkMode = true;
 
-	private void OpenSettings() {
-		_activePage = DesktopPage.Settings;
-		selectedListId = Guid.Empty;
-	}
+      var themeName = SettingsService.Get("Theme", "ODP");
 
-	private void OpenSync() {
-		_activePage = DesktopPage.Sync;
-		selectedListId = Guid.Empty;
-	}
+      if (themeName == "Custom") {
+         var primary = SettingsService.Get("Custom_Primary", "#C678DD");
+         var secondary = SettingsService.Get("Custom_Secondary", "#61AFEF");
+         var background = SettingsService.Get("Custom_Background", "#282C34");
+         var surface = SettingsService.Get("Custom_Surface", "#21252B");
+         _currentTheme = Themes.CreateCustomTheme(primary, secondary, background, surface);
+      }
+      else {
+         _currentTheme = themeName switch {
+            "Blue" => Themes.Blue,
+            "Solarized" => Themes.Solarized,
+            "Green" => Themes.Green,
+            _ => Themes.OneDarkPro
+         };
+      }
+   }
 
-	private void OnSyncModalRequested() {
-		_ = InvokeAsync(() => {
-			OpenSync();
-			StateHasChanged();
-		});
-	}
+   private Task OnSystemDarkModeChanged(bool isDarkMode) {
+      if (_appearance == "System") {
+         _isDarkMode = isDarkMode;
+         _ = PersistThemeAsync();
+         StateHasChanged();
+      }
+      return Task.CompletedTask;
+   }
 
-	private async Task LoadTaskLists() {
-		for (int i = 0; i < 3; i++) {
-			try {
-				taskLists = await ListService.GetAllAsync();
-				return;
-			}
-			catch {
-				if (i == 2)
-					throw;
-				await Task.Delay(500);
-			}
-		}
-	}
+   private void OpenSettings() {
+      _activePage = DesktopPage.Settings;
+      selectedListId = Guid.Empty;
+   }
 
-	private void ShowPlanner() {
-		_activePage = DesktopPage.Planner;
-		selectedListId = Guid.Empty;
-	}
+   private void OpenSync() {
+      _activePage = DesktopPage.Sync;
+      selectedListId = Guid.Empty;
+   }
 
-	private void SelectList(Guid id) {
-		_activePage = DesktopPage.List;
-		selectedListId = id;
-	}
+   private void OpenAbout() {
+      _activePage = DesktopPage.About;
+      selectedListId = Guid.Empty;
+   }
 
-	private async Task AddNewList() {
-		var dialog = await DialogService.ShowAsync<TaskListModal>("New Task List");
-		var result = await dialog.Result;
+   private void OnSyncModalRequested() {
+      _ = InvokeAsync(() => {
+         OpenSync();
+         StateHasChanged();
+      });
+   }
 
-		if (result != null && !result.Canceled && result.Data is TaskListModal.TaskListModalResult modalResult) {
-			var newList = await ListService.CreateAsync(modalResult.Name, modalResult.Color, modalResult.Description);
-			await LoadTaskLists();
-			SelectList(newList.Id);
-		}
-	}
+   private async Task LoadTaskLists() {
+      for (int i = 0; i < 3; i++) {
+         try {
+            taskLists = await ListService.GetAllAsync();
+            _shouldAttachReorder = taskLists.Count > 0;
+            return;
+         }
+         catch {
+            if (i == 2)
+               throw;
+            await Task.Delay(500);
+         }
+      }
+   }
 
-	private async Task OnListDeleted() {
-		await LoadTaskLists();
-		ShowPlanner();
-	}
+   [JSInvokable]
+   public async Task OnReordered(int oldIndex, int newIndex) {
+      if (oldIndex < 0 || oldIndex >= taskLists.Count || newIndex < 0 || newIndex >= taskLists.Count)
+         return;
 
-	private async Task OnSettingsSavedAsync() {
-		LoadSettings();
-		_plannerKey = Guid.NewGuid();
-		await PersistThemeAsync();
-		StateHasChanged();
-	}
+      var item = taskLists[oldIndex];
+      taskLists.RemoveAt(oldIndex);
+      taskLists.Insert(newIndex, item);
 
-	public void Dispose() {
-		SyncModalRequests.OpenRequested -= OnSyncModalRequested;
-	}
+      await ListService.ReorderListsAsync(taskLists.Select(l => l.Id).ToList());
+      _shouldAttachReorder = true;
+      StateHasChanged();
+   }
+
+   private void ShowPlanner() {
+      _activePage = DesktopPage.Planner;
+      selectedListId = Guid.Empty;
+   }
+
+   private void SelectList(Guid id) {
+      _activePage = DesktopPage.List;
+      selectedListId = id;
+   }
+
+   private async Task AddNewList() {
+      var dialog = await DialogService.ShowAsync<TaskListModal>("New Task List");
+      var result = await dialog.Result;
+
+      if (result != null && !result.Canceled && result.Data is TaskListModal.TaskListModalResult modalResult) {
+         var newList = await ListService.CreateAsync(modalResult.Name, modalResult.Color, modalResult.Description);
+         await LoadTaskLists();
+         SelectList(newList.Id);
+      }
+   }
+
+   private async Task OnListDeleted() {
+      await LoadTaskLists();
+      ShowPlanner();
+   }
+
+   private async Task OnSettingsSavedAsync() {
+      LoadSettings();
+      _plannerKey = Guid.NewGuid();
+      await PersistThemeAsync();
+      StateHasChanged();
+   }
+
+   public async ValueTask DisposeAsync() {
+      SyncModalRequests.OpenRequested -= OnSyncModalRequested;
+      if (_reorderInstance != null) {
+         await _reorderInstance.InvokeVoidAsync("dispose");
+         await _reorderInstance.DisposeAsync();
+      }
+      if (_reorderModule != null)
+         await _reorderModule.DisposeAsync();
+      _dotNetRef?.Dispose();
+   }
 }

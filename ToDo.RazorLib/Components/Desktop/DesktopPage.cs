@@ -4,5 +4,6 @@ public enum DesktopPage {
     Planner,
     List,
     Sync,
-    Settings
+    Settings,
+    About
 }

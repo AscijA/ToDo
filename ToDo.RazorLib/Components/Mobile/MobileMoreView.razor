@@ -1,5 +1,3 @@
-@using ToDo.RazorLib.Components.Common
-
 @if (SelectedPage == MobileMorePage.None) {
     <div class="mobile-settings-tab">
         <button type="button" class="mobile-more-row" @onclick="@(() => OnPageSelected.InvokeAsync(MobileMorePage.Sync))">
@@ -9,6 +7,10 @@
         <button type="button" class="mobile-more-row" @onclick="@(() => OnPageSelected.InvokeAsync(MobileMorePage.Settings))">
             <MudIcon Icon="@Icons.Material.Filled.Settings" Color="Color.Primary" />
             <span>Settings</span>
+        </button>
+        <button type="button" class="mobile-more-row" @onclick="@(() => OnPageSelected.InvokeAsync(MobileMorePage.About))">
+            <MudIcon Icon="@Icons.Material.Filled.Info" Color="Color.Primary" />
+            <span>About</span>
         </button>
     </div>
 }
@@ -20,6 +22,11 @@ else if (SelectedPage == MobileMorePage.Sync) {
 else if (SelectedPage == MobileMorePage.Settings) {
     <div class="mobile-subpage">
         <SettingsPage ShowBackButton="true" OnBack="OnBack" OnSaved="OnSettingsSaved" />
+    </div>
+}
+else if (SelectedPage == MobileMorePage.About) {
+    <div class="mobile-subpage">
+        <AboutPage ShowBackButton="true" OnBack="OnBack" />
     </div>
 }
 

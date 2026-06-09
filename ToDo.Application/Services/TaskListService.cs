@@ -20,12 +20,14 @@ public class TaskListService : ITaskListService {
         var lists = await ctx.TaskLists
             .Include(l => l.Items)
                 .ThenInclude(i => i.TaskDefinition)
+            .OrderBy(l => l.Position)
             .ToListAsync();
         return lists.Select(l => new TaskListDto(
             l.Id, 
             l.Name, 
             l.Color, 
             l.Description, 
+            l.Position,
             l.Items.OrderBy(i => i.Position).Select(i => new TaskListItemDto(i.Id, i.TaskDefinitionId, i.TaskDefinition.Title, i.IsDone, i.Position)).ToList()
         )).ToList();
     }
@@ -42,17 +44,21 @@ public class TaskListService : ITaskListService {
             l.Name, 
             l.Color, 
             l.Description, 
+            l.Position,
             l.Items.OrderBy(i => i.Position).Select(i => new TaskListItemDto(i.Id, i.TaskDefinitionId, i.TaskDefinition.Title, i.IsDone, i.Position)).ToList()
         );
     }
 
     public async Task<TaskListDto> CreateAsync(string name, string color, string? description) {
         using var ctx = await _contextFactory.CreateDbContextAsync();
-        var l = new TaskList { Name = name, Color = color, Description = description };
+        var maxPosition = await ctx.TaskLists.AnyAsync()
+            ? await ctx.TaskLists.MaxAsync(t => t.Position)
+            : -1;
+        var l = new TaskList { Name = name, Color = color, Description = description, Position = maxPosition + 1 };
         ctx.TaskLists.Add(l);
         await ctx.SaveChangesAsync();
         _dataChangeNotifier.NotifyChanged();
-        return new TaskListDto(l.Id, l.Name, l.Color, l.Description, new List<TaskListItemDto>());
+        return new TaskListDto(l.Id, l.Name, l.Color, l.Description, l.Position, new List<TaskListItemDto>());
     }
 
     public async Task UpdateAsync(Guid id, string name, string color, string? description) {
@@ -135,6 +141,21 @@ public class TaskListService : ITaskListService {
             var item = items.FirstOrDefault(x => x.Id == itemIds[i]);
             if (item != null) {
                 item.Position = i;
+            }
+        }
+
+        await ctx.SaveChangesAsync();
+        _dataChangeNotifier.NotifyChanged();
+    }
+
+    public async Task ReorderListsAsync(List<Guid> listIds) {
+        using var ctx = await _contextFactory.CreateDbContextAsync();
+        var lists = await ctx.TaskLists.ToListAsync();
+
+        for (int i = 0; i < listIds.Count; i++) {
+            var list = lists.FirstOrDefault(x => x.Id == listIds[i]);
+            if (list != null) {
+                list.Position = i;
             }
         }
 

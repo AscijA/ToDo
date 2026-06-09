@@ -1,5 +1,5 @@
 <aside class="sidebar" aria-label="Primary">
-	<div class="sidebar-top">
+	<div class="sidebar-top" @ref="ListsContainer">
 		<MudIconButton Icon="@Icons.Material.Filled.Schedule"
 						  aria-label="Schedule"
 						  Color="@(ActivePage == DesktopPage.Planner ? Color.Primary : Color.Default)"
@@ -16,21 +16,41 @@
 
 	<div class="sidebar-bottom">
 		<MudIconButton Icon="@Icons.Material.Filled.Add"
-						  aria-label="New"
+						  aria-label="New List"
 						  Color="Color.Primary"
 						  OnClick="OnAddNewList" />
-		<MudIconButton Icon="@Icons.Material.Filled.Sync"
-						  aria-label="Sync"
-						  Color="@(ActivePage == DesktopPage.Sync ? Color.Primary : Color.Default)"
-						  OnClick="OnSyncSelected" />
-		<MudIconButton Icon="@Icons.Material.Filled.Settings"
-						  aria-label="Settings"
-						  Color="@(ActivePage == DesktopPage.Settings ? Color.Primary : Color.Default)"
-						  OnClick="OnSettingsSelected" />
+
+		<div class="sidebar-settings-group">
+			<div class="sidebar-expandable-items @(_expanded ? "expanded" : "")">
+				<MudIconButton Icon="@Icons.Material.Filled.Info"
+								  aria-label="About"
+								  Size="Size.Small"
+								  Color="@(ActivePage == DesktopPage.About ? Color.Primary : Color.Default)"
+								  OnClick="OnAboutSelected" />
+				<MudIconButton Icon="@Icons.Material.Filled.Sync"
+								  aria-label="Sync"
+								  Size="Size.Small"
+								  Color="@(ActivePage == DesktopPage.Sync ? Color.Primary : Color.Default)"
+								  OnClick="OnSyncSelected" />
+			</div>
+			<MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowUp"
+							  aria-label="@(_expanded ? "Hide menu" : "Show menu")"
+							  Size="Size.Small"
+							  Class="@($"sidebar-toggle-arrow {(_expanded ? "rotated" : "")}")"
+							  OnClick="() => _expanded = !_expanded" />
+			<MudIconButton Icon="@Icons.Material.Filled.Settings"
+							  aria-label="Settings"
+							  Color="@(ActivePage == DesktopPage.Settings ? Color.Primary : Color.Default)"
+							  OnClick="OnSettingsSelected" />
+		</div>
 	</div>
 </aside>
 
 @code {
+	private bool _expanded;
+
+	public ElementReference ListsContainer;
+
 	[Parameter]
 	public IReadOnlyList<TaskListDto> TaskLists { get; set; } = Array.Empty<TaskListDto>();
 
@@ -54,6 +74,9 @@
 
 	[Parameter]
 	public EventCallback OnSettingsSelected { get; set; }
+
+	[Parameter]
+	public EventCallback OnAboutSelected { get; set; }
 
 	private static string GetIconLetter(string name) =>
 		string.IsNullOrWhiteSpace(name) ? "?" : name.Trim()[0].ToString().ToUpperInvariant();

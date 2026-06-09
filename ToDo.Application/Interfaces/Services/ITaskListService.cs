@@ -12,4 +12,5 @@ public interface ITaskListService {
     Task UpdateItemAsync(TaskListItemDto item);
     Task DeleteItemAsync(Guid itemId);
     Task UpdateOrderAsync(Guid listId, List<Guid> itemIds);
+    Task ReorderListsAsync(List<Guid> listIds);
 }

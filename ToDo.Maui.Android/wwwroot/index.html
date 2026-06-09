@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
    <meta charset="utf-8" />
-   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
    <title>ToDo AscijA</title>
    <base href="/" />
    <link rel="stylesheet" href="app.css" />
@@ -15,7 +15,6 @@
       (function () {
          var bg = localStorage.getItem('theme_background');
          var pr = localStorage.getItem('theme_primary');
-         var isDark = localStorage.getItem('theme_isDark');
          if (!bg) {
             var systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
             bg = systemDark ? '#282C34' : '#F5F5F5';
@@ -63,6 +62,7 @@
 
    <script src="_framework/blazor.webview.js" autostart="false"></script>
    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+   <script src="_content/ToDo.RazorLib/draggable.min.js"></script>
    <script src="_content/ToDo.RazorLib/theme-store.js"></script>
 </body>
 

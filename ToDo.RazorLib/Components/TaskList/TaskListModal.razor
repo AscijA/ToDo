@@ -3,7 +3,7 @@
 <MudDialog>
     <DialogContent>
         <div @onkeydown="HandleKeyDown">
-            <MudTextField @bind-Value="Name" Label="Name" Required="true" />
+            <MudTextField @bind-Value="Name" Label="Name" Required="true" AutoFocus="true" />
             <MudColorPicker @bind-Text="ListColor" Label="Color" Style="@($"color: {ListColor};")" />
             <MudTextField @bind-Value="Description" Label="Description" Lines="3" />
         </div>

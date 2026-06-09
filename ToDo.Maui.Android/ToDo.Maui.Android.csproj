@@ -20,16 +20,9 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<MauiIcon
-			Include="Resources\AppIcon\appicon.png"
-			BaseSize="128,128"
-			Color="#000000"
-			ForegroundScale="0.65" />
+		<MauiIcon Include="Resources\AppIcon\appicon.png" BaseSize="128,128" Color="#000000" ForegroundScale="0.65" />
 
-		<MauiSplashScreen
-			Include="Resources\AppIcon\appicon.png"
-			BaseSize="128,128"
-			ForegroundScale="0.55" />
+		<MauiSplashScreen Include="Resources\AppIcon\appicon.png" BaseSize="128,128" ForegroundScale="0.55" />
 	</ItemGroup>
 
 	<ItemGroup>

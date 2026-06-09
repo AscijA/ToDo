@@ -22,9 +22,8 @@
         @if (Items.Count > 0) {
             <div class="tasklist-item-dropzone" @ref="itemsContainer">
                 @foreach (var item in Items) {
-                    <div class="tasklist-draggable-row @(draggedItemId == item.Id ? "tasklist-item-dragging" : "")"
-                         @key="item.Id"
-                         data-task-list-item-id="@item.Id">
+                    <div class="tasklist-draggable-row"
+                         @key="item.Id">
                         <div class="tasklist-drag-handle" title="Drag to reorder">
                             <MudIcon Icon="@Icons.Material.Filled.DragIndicator" Size="Size.Small" />
                         </div>
@@ -59,7 +58,6 @@
     private DotNetObjectReference<TaskList>? dotNetReference;
     private IJSObjectReference? reorderModule;
     private IJSObjectReference? reorderInstance;
-    private Guid? draggedItemId;
     private bool shouldAttachReorder;
 
     protected override async Task OnParametersSetAsync() {
@@ -79,7 +77,7 @@
                 await reorderInstance.DisposeAsync();
             }
 
-            reorderInstance = await reorderModule.InvokeAsync<IJSObjectReference>("attachTaskListReorder", itemsContainer, dotNetReference);
+            reorderInstance = await reorderModule.InvokeAsync<IJSObjectReference>("attachSortable", itemsContainer, dotNetReference, ".tasklist-draggable-row", ".tasklist-drag-handle");
         }
     }
 
@@ -99,51 +97,20 @@
     }
 
     [JSInvokable]
-    public async Task MoveItemById(string sourceItemId, string targetItemId, string placement) {
-        if (!Guid.TryParse(sourceItemId, out var sourceId) || !Guid.TryParse(targetItemId, out var targetId) || sourceId == targetId) {
+    public async Task OnReordered(int oldIndex, int newIndex) {
+        if (oldIndex < 0 || oldIndex >= Items.Count || newIndex < 0 || newIndex >= Items.Count)
             return;
-        }
 
-        draggedItemId = sourceId;
-        var sourceIndex = Items.FindIndex(item => item.Id == sourceId);
-        var targetIndex = Items.FindIndex(item => item.Id == targetId);
-        if (sourceIndex < 0 || targetIndex < 0) {
-            draggedItemId = null;
-            return;
-        }
-
-        var draggedItem = Items[sourceIndex];
-        Items.RemoveAt(sourceIndex);
-        if (sourceIndex < targetIndex) {
-            targetIndex--;
-        }
-
-        if (placement == "after") {
-            targetIndex++;
-        }
-
-        targetIndex = Math.Clamp(targetIndex, 0, Items.Count);
-        Items.Insert(targetIndex, draggedItem);
+        var item = Items[oldIndex];
+        Items.RemoveAt(oldIndex);
+        Items.Insert(newIndex, item);
 
         Items = Items
-            .Select((item, index) => item with { Position = index })
+            .Select((i, idx) => i with { Position = idx })
             .ToList();
 
-        await ListService.UpdateOrderAsync(ListId, Items.Select(item => item.Id).ToList());
-        draggedItemId = null;
+        await ListService.UpdateOrderAsync(ListId, Items.Select(i => i.Id).ToList());
         shouldAttachReorder = true;
-        StateHasChanged();
-    }
-
-    [JSInvokable]
-    public void SetDraggingItem(string? itemId) {
-        draggedItemId = Guid.TryParse(itemId, out var id) ? id : null;
-        StateHasChanged();
-    }
-
-    [JSInvokable]
-    public void ClearDraggingItem() {
-        draggedItemId = null;
         StateHasChanged();
     }
 
