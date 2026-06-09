@@ -252,6 +252,10 @@
 			_availableDevices = discovery.Devices;
 			_discoveryMessage = SyncUserMessages.Discovery(discovery.Message);
 		}
+		catch (Exception ex) {
+			_availableDevices = Array.Empty<AvailableSyncDevice>();
+			_discoveryMessage = SyncUserMessages.Explain(ex);
+		}
 		finally {
 			_isDiscovering = false;
 		}

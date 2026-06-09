@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Text.Json;
 
 namespace ToDo.RazorLib.Services;
 
@@ -21,6 +22,7 @@ public sealed class ManualAddressSyncDiscoveryService : ISyncDiscoveryService {
             using var httpClient = new HttpClient {
                 Timeout = RequestTimeout
             };
+            httpClient.DefaultRequestHeaders.ConnectionClose = true;
 
             hello = await httpClient.GetFromJsonAsync<SyncHelloResponse>(
                 $"http://{address}/sync/hello",
@@ -32,7 +34,13 @@ public sealed class ManualAddressSyncDiscoveryService : ISyncDiscoveryService {
         catch (HttpRequestException) {
             return new SyncDiscoveryResult(Array.Empty<AvailableSyncDevice>(), $"Could not connect to {address}. Make sure both devices are on the same network and Sync is turned on.");
         }
+        catch (IOException) {
+            return new SyncDiscoveryResult(Array.Empty<AvailableSyncDevice>(), $"The device at {address} closed the connection before answering. Check the address and make sure Sync is turned on there.");
+        }
         catch (NotSupportedException) {
+            return new SyncDiscoveryResult(Array.Empty<AvailableSyncDevice>(), $"The device at {address} did not answer like a ToDo sync device.");
+        }
+        catch (JsonException) {
             return new SyncDiscoveryResult(Array.Empty<AvailableSyncDevice>(), $"The device at {address} did not answer like a ToDo sync device.");
         }
 

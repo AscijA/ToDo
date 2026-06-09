@@ -64,6 +64,7 @@ public sealed class AutoSyncChangeNotifier : IDataChangeNotifier, IDisposable {
             foreach (var device in syncService.GetPairedDevices()) {
                 cancellationToken.ThrowIfCancellationRequested();
                 try {
+                    await syncService.PushLocalNewAsync(device, cancellationToken);
                     await syncService.ImportRemoteNewAsync(device, cancellationToken);
                 }
                 catch (Exception ex) {

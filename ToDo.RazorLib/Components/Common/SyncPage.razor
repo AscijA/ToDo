@@ -26,6 +26,7 @@
 			<MudTextField @bind-Value="_deviceName"
 							  @bind-Value:after="SaveSyncSettingsAsync"
 							  Label="Device Name"
+							  Immediate="true"
 							  Required="true" />
 
 			<MudSwitch T="bool"
@@ -38,6 +39,7 @@
 			<MudTextField @bind-Value="_manualAddress"
 							  @bind-Value:after="SaveSyncSettingsAsync"
 							  Label="Manual device address"
+							  Immediate="true"
 							  Placeholder="192.168.1.25:51234" />
 
 			<MudDivider />
@@ -94,6 +96,7 @@
 	private string? _pairingMessage;
 	private PeriodicTimer? _incomingPairingTimer;
 	private CancellationTokenSource? _incomingPairingTimerCancellation;
+	private string _pairedDeviceSignature = string.Empty;
 	private bool _isDiscovering;
 	private IMask pairingCodeMask = new PatternMask("000-000");
 	private bool _isPairingBusy;
@@ -106,6 +109,7 @@
 		_deviceName = identity.DeviceName;
 		_manualAddress = identity.ManualAddress;
 		_pairedDevices = SyncService.GetPairedDevices();
+		_pairedDeviceSignature = GetPairedDeviceSignature(_pairedDevices);
 		await ApplyTransportStateAsync();
 		RefreshIncomingPairingRequests();
 		StartIncomingPairingRefresh();
@@ -131,6 +135,10 @@
 			var discovery = await SyncService.DiscoverAvailableDevicesAsync();
 			_availableDevices = discovery.Devices;
 			_discoveryMessage = SyncUserMessages.Discovery(discovery.Message);
+		}
+		catch (Exception ex) {
+			_availableDevices = Array.Empty<AvailableSyncDevice>();
+			_discoveryMessage = SyncUserMessages.Explain(ex);
 		}
 		finally {
 			_isDiscovering = false;
@@ -226,6 +234,7 @@
 		_pairingCodeConfirmation = string.Empty;
 		_pairingMessage = null;
 		_pairedDevices = SyncService.GetPairedDevices();
+		_pairedDeviceSignature = GetPairedDeviceSignature(_pairedDevices);
 		await RefreshAvailableDevicesAsync();
 		StateHasChanged();
 	}
@@ -244,6 +253,17 @@
 		_incomingPairingRequests = SyncTransportService.GetIncomingPairingRequests();
 	}
 
+	private void RefreshPairedDevicesIfChanged() {
+		var pairedDevices = SyncService.GetPairedDevices();
+		var signature = GetPairedDeviceSignature(pairedDevices);
+		if (string.Equals(signature, _pairedDeviceSignature, StringComparison.Ordinal)) {
+			return;
+		}
+
+		_pairedDevices = pairedDevices;
+		_pairedDeviceSignature = signature;
+	}
+
 	private void StartIncomingPairingRefresh() {
 		_incomingPairingTimerCancellation = new CancellationTokenSource();
 		_incomingPairingTimer = new PeriodicTimer(TimeSpan.FromSeconds(1));
@@ -259,6 +279,7 @@
 			while (await _incomingPairingTimer.WaitForNextTickAsync(cancellationToken)) {
 				await InvokeAsync(() => {
 					RefreshIncomingPairingRequests();
+					RefreshPairedDevicesIfChanged();
 					StateHasChanged();
 				});
 			}
@@ -298,8 +319,15 @@
 
 	private async Task RefreshPairedDevicesAsync() {
 		_pairedDevices = SyncService.GetPairedDevices();
+		_pairedDeviceSignature = GetPairedDeviceSignature(_pairedDevices);
 		await RefreshAvailableDevicesAsync();
 		StateHasChanged();
+	}
+
+	private static string GetPairedDeviceSignature(IReadOnlyList<PairedSyncDevice> devices) {
+		return string.Join('|', devices
+			.OrderBy(device => device.DeviceId, StringComparer.OrdinalIgnoreCase)
+			.Select(device => $"{device.DeviceId}:{device.LastSyncedAt?.ToUnixTimeMilliseconds()}:{device.IsOnline}"));
 	}
 
 	public void Dispose() {

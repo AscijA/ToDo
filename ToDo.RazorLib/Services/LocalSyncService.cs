@@ -16,17 +16,17 @@ public sealed class LocalSyncService : ISyncService {
     private readonly ISettingsService settings;
     private readonly ISyncDiscoveryService discoveryService;
     private readonly ISyncSnapshotService snapshotService;
-    private readonly IDbContextFactory<TodoDbContext> contextFactory;
+    private readonly ISyncSnapshotImportService snapshotImportService;
 
     public LocalSyncService(
         ISettingsService settings,
         ISyncDiscoveryService discoveryService,
         ISyncSnapshotService snapshotService,
-        IDbContextFactory<TodoDbContext> contextFactory) {
+        ISyncSnapshotImportService snapshotImportService) {
         this.settings = settings;
         this.discoveryService = discoveryService;
         this.snapshotService = snapshotService;
-        this.contextFactory = contextFactory;
+        this.snapshotImportService = snapshotImportService;
     }
 
     public SyncDeviceIdentity GetLocalDevice() {
@@ -225,138 +225,35 @@ public sealed class LocalSyncService : ISyncService {
         PairedSyncDevice device,
         CancellationToken cancellationToken = default) {
         var remoteSnapshot = await FetchSnapshotAsync(device, cancellationToken);
-        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+        var import = await snapshotImportService.ImportNewAsync(remoteSnapshot, cancellationToken);
+        AddOrReplacePairedDevice(device with { LastSyncedAt = DateTimeOffset.Now, IsOnline = true });
+        return import;
+    }
 
-        var importCounts = new List<SyncEntityImportCount>();
+    public async Task<SyncImportSummary> PushLocalNewAsync(
+        PairedSyncDevice device,
+        CancellationToken cancellationToken = default) {
+        var localDevice = GetLocalDevice();
+        var localSnapshot = await snapshotService.CreateSnapshotAsync(localDevice, cancellationToken);
+        using var httpClient = CreatePairingClient();
+        var response = await PostJsonAsync(
+            httpClient,
+            $"http://{device.Address}/sync/import-new",
+            new SyncImportNewRequest(localDevice.DeviceId, device.TrustToken, localSnapshot),
+            cancellationToken);
 
-        var existingTaskDefinitionIds = await context.TaskDefinitions
-            .Select(task => task.Id)
-            .ToHashSetAsync(cancellationToken);
-        var taskDefinitionsToAdd = remoteSnapshot.TaskDefinitions
-            .Where(task => !existingTaskDefinitionIds.Contains(task.Id))
-            .Select(task => new TaskDefinition {
-                Id = task.Id,
-                Title = task.Title,
-                Description = task.Description
-            })
-            .ToList();
-        context.TaskDefinitions.AddRange(taskDefinitionsToAdd);
-        AddImportCount(importCounts, "task definitions", taskDefinitionsToAdd.Count, 0);
+        if (!response.IsSuccessStatusCode) {
+            var error = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new InvalidOperationException($"Push failed: {(int)response.StatusCode} {response.ReasonPhrase}. {error}");
+        }
 
-        var existingTaskListIds = await context.TaskLists
-            .Select(list => list.Id)
-            .ToHashSetAsync(cancellationToken);
-        var taskListsToAdd = remoteSnapshot.TaskLists
-            .Where(list => !existingTaskListIds.Contains(list.Id))
-            .Select(list => new TaskList {
-                Id = list.Id,
-                Name = list.Name,
-                Color = list.Color,
-                Description = list.Description
-            })
-            .ToList();
-        context.TaskLists.AddRange(taskListsToAdd);
-        AddImportCount(importCounts, "task lists", taskListsToAdd.Count, 0);
-
-        existingTaskDefinitionIds.UnionWith(taskDefinitionsToAdd.Select(task => task.Id));
-        existingTaskListIds.UnionWith(taskListsToAdd.Select(list => list.Id));
-
-        var existingTaskListItemIds = await context.TaskListItems
-            .Select(item => item.Id)
-            .ToHashSetAsync(cancellationToken);
-        var taskListItemsToAdd = remoteSnapshot.TaskListItems
-            .Where(item => !existingTaskListItemIds.Contains(item.Id))
-            .Where(item => existingTaskDefinitionIds.Contains(item.TaskDefinitionId) && existingTaskListIds.Contains(item.TaskListId))
-            .Select(item => new TaskListItem {
-                Id = item.Id,
-                TaskDefinitionId = item.TaskDefinitionId,
-                TaskListId = item.TaskListId,
-                IsDone = item.IsDone,
-                Position = item.Position
-            })
-            .ToList();
-        var skippedTaskListItems = remoteSnapshot.TaskListItems.Count(item =>
-            !existingTaskListItemIds.Contains(item.Id) &&
-            (!existingTaskDefinitionIds.Contains(item.TaskDefinitionId) || !existingTaskListIds.Contains(item.TaskListId)));
-        context.TaskListItems.AddRange(taskListItemsToAdd);
-        AddImportCount(importCounts, "task list items", taskListItemsToAdd.Count, skippedTaskListItems);
-
-        var dailyPlanIdsByDate = await GetPlanIdsByDateAsync(context.DailyPlans, cancellationToken);
-        var weeklyPlanIdsByDate = await GetPlanIdsByDateAsync(context.WeeklyPlans, cancellationToken);
-        var monthlyPlanIdsByDate = await GetPlanIdsByDateAsync(context.MonthlyPlans, cancellationToken);
-
-        AddMissingPlans(context.DailyPlans, dailyPlanIdsByDate, remoteSnapshot.DailyOccurrences.Select(occurrence => (occurrence.Date, occurrence.DailyPlanId)));
-        AddMissingPlans(context.WeeklyPlans, weeklyPlanIdsByDate, remoteSnapshot.WeeklyOccurrences.Select(occurrence => (occurrence.WeekStart, occurrence.WeeklyPlanId)));
-        AddMissingPlans(context.MonthlyPlans, monthlyPlanIdsByDate, remoteSnapshot.MonthlyOccurrences.Select(occurrence => (occurrence.MonthStart, occurrence.MonthlyPlanId)));
-
-        var existingDailyOccurrenceIds = await context.DailyOccurrences
-            .Select(occurrence => occurrence.Id)
-            .ToHashSetAsync(cancellationToken);
-        var dailyOccurrencesToAdd = remoteSnapshot.DailyOccurrences
-            .Where(occurrence => !existingDailyOccurrenceIds.Contains(occurrence.Id))
-            .Where(occurrence => existingTaskDefinitionIds.Contains(occurrence.TaskDefinitionId))
-            .Select(occurrence => new DailyOccurrence {
-                Id = occurrence.Id,
-                TaskDefinitionId = occurrence.TaskDefinitionId,
-                DailyPlanId = dailyPlanIdsByDate[occurrence.Date],
-                IsDone = occurrence.IsDone,
-                Timeslot = occurrence.Timeslot,
-                SortOrder = occurrence.SortOrder
-            })
-            .ToList();
-        var skippedDailyOccurrences = remoteSnapshot.DailyOccurrences.Count(occurrence =>
-            !existingDailyOccurrenceIds.Contains(occurrence.Id) &&
-            !existingTaskDefinitionIds.Contains(occurrence.TaskDefinitionId));
-        context.DailyOccurrences.AddRange(dailyOccurrencesToAdd);
-        AddImportCount(importCounts, "daily planner items", dailyOccurrencesToAdd.Count, skippedDailyOccurrences);
-
-        var existingWeeklyOccurrenceIds = await context.WeeklyOccurrences
-            .Select(occurrence => occurrence.Id)
-            .ToHashSetAsync(cancellationToken);
-        var weeklyOccurrencesToAdd = remoteSnapshot.WeeklyOccurrences
-            .Where(occurrence => !existingWeeklyOccurrenceIds.Contains(occurrence.Id))
-            .Where(occurrence => existingTaskDefinitionIds.Contains(occurrence.TaskDefinitionId))
-            .Select(occurrence => new WeeklyOccurrence {
-                Id = occurrence.Id,
-                TaskDefinitionId = occurrence.TaskDefinitionId,
-                WeeklyPlanId = weeklyPlanIdsByDate[occurrence.WeekStart],
-                IsDone = occurrence.IsDone,
-                DayOfWeek = occurrence.DayOfWeek
-            })
-            .ToList();
-        var skippedWeeklyOccurrences = remoteSnapshot.WeeklyOccurrences.Count(occurrence =>
-            !existingWeeklyOccurrenceIds.Contains(occurrence.Id) &&
-            !existingTaskDefinitionIds.Contains(occurrence.TaskDefinitionId));
-        context.WeeklyOccurrences.AddRange(weeklyOccurrencesToAdd);
-        AddImportCount(importCounts, "weekly planner items", weeklyOccurrencesToAdd.Count, skippedWeeklyOccurrences);
-
-        var existingMonthlyOccurrenceIds = await context.MonthlyOccurrences
-            .Select(occurrence => occurrence.Id)
-            .ToHashSetAsync(cancellationToken);
-        var monthlyOccurrencesToAdd = remoteSnapshot.MonthlyOccurrences
-            .Where(occurrence => !existingMonthlyOccurrenceIds.Contains(occurrence.Id))
-            .Where(occurrence => existingTaskDefinitionIds.Contains(occurrence.TaskDefinitionId))
-            .Select(occurrence => new MonthlyOccurrence {
-                Id = occurrence.Id,
-                TaskDefinitionId = occurrence.TaskDefinitionId,
-                MonthlyPlanId = monthlyPlanIdsByDate[occurrence.MonthStart],
-                IsDone = occurrence.IsDone,
-                DayOfMonth = occurrence.DayOfMonth
-            })
-            .ToList();
-        var skippedMonthlyOccurrences = remoteSnapshot.MonthlyOccurrences.Count(occurrence =>
-            !existingMonthlyOccurrenceIds.Contains(occurrence.Id) &&
-            !existingTaskDefinitionIds.Contains(occurrence.TaskDefinitionId));
-        context.MonthlyOccurrences.AddRange(monthlyOccurrencesToAdd);
-        AddImportCount(importCounts, "monthly planner items", monthlyOccurrencesToAdd.Count, skippedMonthlyOccurrences);
-
-        await context.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
+        var import = await response.Content.ReadFromJsonAsync<SyncImportSummary>(cancellationToken);
+        if (import == null) {
+            throw new InvalidOperationException("Push returned an invalid response.");
+        }
 
         AddOrReplacePairedDevice(device with { LastSyncedAt = DateTimeOffset.Now, IsOnline = true });
-
-        return new SyncImportSummary(remoteSnapshot.DeviceName, importCounts);
+        return import;
     }
 
     public void RemovePairedDevice(string deviceId) {
@@ -674,9 +571,11 @@ public sealed class LocalSyncService : ISyncService {
     }
 
     private static HttpClient CreatePairingClient() {
-        return new HttpClient {
+        var httpClient = new HttpClient {
             Timeout = TimeSpan.FromSeconds(5)
         };
+        httpClient.DefaultRequestHeaders.ConnectionClose = true;
+        return httpClient;
     }
 
     private static async Task<HttpResponseMessage> PostJsonAsync<T>(

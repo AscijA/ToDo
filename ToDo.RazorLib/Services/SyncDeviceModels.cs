@@ -87,6 +87,11 @@ public sealed record SyncSnapshotRequest(
     string DeviceId,
     string TrustToken);
 
+public sealed record SyncImportNewRequest(
+    string DeviceId,
+    string TrustToken,
+    SyncSnapshotResponse Snapshot);
+
 public sealed record SyncSnapshotResponse(
     string DeviceId,
     string DeviceName,

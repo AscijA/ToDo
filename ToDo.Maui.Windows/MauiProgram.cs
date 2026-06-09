@@ -72,6 +72,7 @@ public static class MauiProgram {
         builder.Services.AddSingleton<ISettingsService, MauiSettingsService>();
         builder.Services.AddSingleton<ISyncDiscoveryService, ManualAddressSyncDiscoveryService>();
         builder.Services.AddSingleton<ISyncSnapshotService, SyncSnapshotService>();
+        builder.Services.AddSingleton<ISyncSnapshotImportService, SyncSnapshotImportService>();
         builder.Services.AddSingleton<ISyncTransportService, LocalHttpSyncTransportService>();
         builder.Services.AddSingleton<ISyncService, LocalSyncService>();
         builder.Services.AddSingleton<IDataChangeNotifier, AutoSyncChangeNotifier>();

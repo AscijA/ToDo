@@ -15,6 +15,7 @@ public sealed class LocalHttpSyncTransportService : ISyncTransportService {
     private readonly object gate = new();
     private readonly ISettingsService settings;
     private readonly ISyncSnapshotService snapshotService;
+    private readonly ISyncSnapshotImportService snapshotImportService;
     private readonly Dictionary<string, PendingPairing> pendingPairings = new(StringComparer.OrdinalIgnoreCase);
     private TcpListener? listener;
     private CancellationTokenSource? listenerCancellation;
@@ -22,9 +23,13 @@ public sealed class LocalHttpSyncTransportService : ISyncTransportService {
     private SyncDeviceIdentity? currentIdentity;
     private SyncTransportStatus status = new(false, null, null, null, null);
 
-    public LocalHttpSyncTransportService(ISettingsService settings, ISyncSnapshotService snapshotService) {
+    public LocalHttpSyncTransportService(
+        ISettingsService settings,
+        ISyncSnapshotService snapshotService,
+        ISyncSnapshotImportService snapshotImportService) {
         this.settings = settings;
         this.snapshotService = snapshotService;
+        this.snapshotImportService = snapshotImportService;
     }
 
     public SyncTransportStatus GetStatus() {
@@ -173,6 +178,7 @@ public sealed class LocalHttpSyncTransportService : ISyncTransportService {
 
         if (string.Equals(method, "GET", StringComparison.OrdinalIgnoreCase) &&
             string.Equals(path, "/sync/hello", StringComparison.OrdinalIgnoreCase)) {
+            await ReadHeadersAsync(reader, cancellationToken);
             await HandleHelloAsync(stream, cancellationToken);
             return;
         }
@@ -205,11 +211,20 @@ public sealed class LocalHttpSyncTransportService : ISyncTransportService {
             return;
         }
 
+        if (string.Equals(method, "POST", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(path, "/sync/import-new", StringComparison.OrdinalIgnoreCase)) {
+            var body = await ReadBodyAsync(reader, cancellationToken);
+            await HandleImportNewAsync(stream, body, cancellationToken);
+            return;
+        }
+
         if (!string.Equals(method, "GET", StringComparison.OrdinalIgnoreCase) && !string.Equals(method, "POST", StringComparison.OrdinalIgnoreCase)) {
+            await ReadHeadersAsync(reader, cancellationToken);
             await WriteResponseAsync(stream, 405, "Method Not Allowed", "text/plain", "Method not allowed", cancellationToken);
             return;
         }
 
+        await ReadHeadersAsync(reader, cancellationToken);
         await WriteResponseAsync(stream, 404, "Not Found", "text/plain", "Not found", cancellationToken);
     }
 
@@ -364,6 +379,38 @@ public sealed class LocalHttpSyncTransportService : ISyncTransportService {
         await WriteJsonResponseAsync(stream, snapshot, cancellationToken);
     }
 
+    private async Task HandleImportNewAsync(NetworkStream stream, string body, CancellationToken cancellationToken) {
+        var identity = currentIdentity;
+        if (identity == null) {
+            await WriteResponseAsync(stream, 503, "Service Unavailable", "text/plain", "Sync is not available", cancellationToken);
+            return;
+        }
+
+        var request = DeserializeBody<SyncImportNewRequest>(body);
+        if (request == null ||
+            string.IsNullOrWhiteSpace(request.DeviceId) ||
+            string.IsNullOrWhiteSpace(request.TrustToken) ||
+            request.Snapshot == null) {
+            await WriteResponseAsync(stream, 400, "Bad Request", "text/plain", "Invalid import request", cancellationToken);
+            return;
+        }
+
+        if (!string.Equals(request.Snapshot.DeviceId, request.DeviceId, StringComparison.OrdinalIgnoreCase)) {
+            await WriteResponseAsync(stream, 400, "Bad Request", "text/plain", "Snapshot device does not match request device", cancellationToken);
+            return;
+        }
+
+        if (!await TryAuthorizePairedDeviceAsync(stream, request.DeviceId, request.TrustToken, cancellationToken)) {
+            return;
+        }
+
+        var import = await snapshotImportService.ImportNewAsync(request.Snapshot, cancellationToken);
+        AddOrReplacePairedDevice(LoadPairedDevices()
+            .First(device => string.Equals(device.DeviceId, request.DeviceId, StringComparison.OrdinalIgnoreCase))
+            with { LastSyncedAt = DateTimeOffset.Now, IsOnline = true });
+        await WriteJsonResponseAsync(stream, import, cancellationToken);
+    }
+
     private async Task<bool> TryAuthorizePairedDeviceAsync(
         NetworkStream stream,
         string deviceId,
@@ -386,15 +433,7 @@ public sealed class LocalHttpSyncTransportService : ISyncTransportService {
     }
 
     private async Task<string> ReadBodyAsync(StreamReader reader, CancellationToken cancellationToken) {
-        var contentLength = 0;
-        string? line;
-        while (!string.IsNullOrEmpty(line = await reader.ReadLineAsync(cancellationToken))) {
-            const string prefix = "Content-Length:";
-            if (line.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) &&
-                int.TryParse(line[prefix.Length..].Trim(), out var parsedLength)) {
-                contentLength = parsedLength;
-            }
-        }
+        var contentLength = await ReadHeadersAsync(reader, cancellationToken);
 
         if (contentLength <= 0) {
             return string.Empty;
@@ -412,6 +451,20 @@ public sealed class LocalHttpSyncTransportService : ISyncTransportService {
         }
 
         return new string(buffer, 0, read);
+    }
+
+    private static async Task<int> ReadHeadersAsync(StreamReader reader, CancellationToken cancellationToken) {
+        var contentLength = 0;
+        string? line;
+        while (!string.IsNullOrEmpty(line = await reader.ReadLineAsync(cancellationToken))) {
+            const string prefix = "Content-Length:";
+            if (line.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) &&
+                int.TryParse(line[prefix.Length..].Trim(), out var parsedLength)) {
+                contentLength = parsedLength;
+            }
+        }
+
+        return contentLength;
     }
 
     private static T? DeserializeBody<T>(string body) {
@@ -507,6 +560,7 @@ public sealed class LocalHttpSyncTransportService : ISyncTransportService {
         var headerBytes = Encoding.ASCII.GetBytes(header);
         await stream.WriteAsync(headerBytes, cancellationToken);
         await stream.WriteAsync(bodyBytes, cancellationToken);
+        await stream.FlushAsync(cancellationToken);
     }
 
     private static string? GetLocalAddress() {
