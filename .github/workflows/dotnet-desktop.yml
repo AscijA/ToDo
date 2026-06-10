@@ -18,6 +18,7 @@ jobs:
       Solution_Name: ToDo.slnx
       Project_Path: ToDo.Maui.Windows/ToDo.Maui.Windows.csproj
       Wap_Project_Directory: ToDo.Maui.Windows
+      BASE_VERSION: "1.0" # Change this when you make major/minor updates
 
     steps:
     - name: Checkout
@@ -33,27 +34,27 @@ jobs:
     - name: Install MAUI Workload
       run: dotnet workload install maui
 
-    # 1. Decode your permanent PFX from secrets onto the runner
+    # Decode your permanent PFX from secrets onto the runner
     - name: Decode the PFX
       run: |
         $pfx_cert_byte = [System.Convert]::FromBase64String("${{ secrets.Base64_Encoded_Pfx }}")
         $certificatePath = Join-Path -Path $env:Wap_Project_Directory -ChildPath PermanentSigningCert.pfx
         [IO.File]::WriteAllBytes("$certificatePath", $pfx_cert_byte)
 
-    # 2. FIX: Import the certificate into the build machine store so MSBuild doesn't block it
+    # Import the certificate into the build machine store so MSBuild doesn't block it
     - name: Import PFX to Machine Store
       run: certutil -user -p "${{ secrets.Pfx_Key }}" -importpfx "${{ env.Wap_Project_Directory }}\PermanentSigningCert.pfx" NoRoot
 
-    # 3. Publish and Sign using your decoded PFX file
+    # Publish and Sign using your decoded PFX file with Automatic Versioning
     - name: Publish MAUI Windows App
-      run: dotnet publish ${{ env.Project_Path }} -c ${{ matrix.configuration }} -f net10.0-windows10.0.19041.0 -r win-x64 -p:GenerateAppxPackageOnBuild=true -p:AppxPackageSigningEnabled=true -p:PackageCertificateKeyFile=PermanentSigningCert.pfx -p:PackageCertificatePassword="${{ secrets.Pfx_Key }}"
+      run: dotnet publish ${{ env.Project_Path }} -c ${{ matrix.configuration }} -f net10.0-windows10.0.19041.0 -r win-x64 -p:GenerateAppxPackageOnBuild=true -p:AppxPackageSigningEnabled=true -p:PackageCertificateKeyFile=PermanentSigningCert.pfx -p:PackageCertificatePassword="${{ secrets.Pfx_Key }}" -p:ApplicationDisplayVersion="${{ env.BASE_VERSION }}.${{ github.run_number }}" -p:ApplicationVersion=${{ github.run_number }}
 
-    # 4. Clean up the PFX file immediately after build
+    # Clean up the PFX file immediately after build
     - name: Remove the PFX
       run: Remove-Item -path $env:Wap_Project_Directory\PermanentSigningCert.pfx -Force
 
     - name: Upload Packaged Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: ToDo-Windows-App
+        name: ToDo-Windows-App-Build-${{ github.run_number }}
         path: "**/AppPackages/**"
