@@ -1,10 +1,6 @@
 name: Build and Auto-Release MAUI Apps
 
 on:
-  push:
-    branches: [ "master" ]
-  pull_request:
-    branches: [ "master" ]
   workflow_dispatch: # ◄ Allows you to trigger this entire pipeline manually whenever you want
 
 # Grants the workflow secure write permissions to publish releases automatically
