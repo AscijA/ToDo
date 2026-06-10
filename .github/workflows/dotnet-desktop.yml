@@ -40,17 +40,9 @@ jobs:
         $certificatePath = Join-Path -Path $env:Wap_Project_Directory -ChildPath PermanentSigningCert.pfx
         [IO.File]::WriteAllBytes("$certificatePath", $pfx_cert_byte)
 
-    # Publish and Sign using your decoded PFX file
+    # Publish and Sign using your decoded PFX file (Flattened to avoid backtick syntax errors)
     - name: Publish MAUI Windows App
-      run: |
-        dotnet publish ${{ env.Project_Path }} `
-          -c ${{ matrix.configuration }} `
-          -f net10.0-windows10.0.19041.0 `
-          -r win-x64 `
-          -p:GenerateAppxPackageOnBuild=true `
-          -p:AppxPackageSigningEnabled=true `
-          -p:PackageCertificateKeyFile=PermanentSigningCert.pfx `
-          -p:PackageCertificatePassword="${{ secrets.Pfx_Key }}"
+      run: dotnet publish ${{ env.Project_Path }} -c ${{ matrix.configuration }} -f net10.0-windows10.0.19041.0 -r win-x64 -p:GenerateAppxPackageOnBuild=true -p:AppxPackageSigningEnabled=true -p:PackageCertificateKeyFile=PermanentSigningCert.pfx -p:PackageCertificatePassword="${{ secrets.Pfx_Key }}"
 
     # Clean up the PFX file immediately after build
     - name: Remove the PFX
@@ -60,4 +52,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: ToDo-Windows-App
-        path: **/AppPackages/**/*
+        path: "**/AppPackages/**"
