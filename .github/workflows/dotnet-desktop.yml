@@ -41,11 +41,25 @@ jobs:
         $certificatePath = Join-Path -Path $env:Wap_Project_Directory -ChildPath PermanentSigningCert.pfx
         [IO.File]::WriteAllBytes("$certificatePath", $pfx_cert_byte)
 
-    # Import the certificate into the build machine store so MSBuild doesn't block it
+    # FIX: Import PFX via PowerShell with precise Key Storage Flags to grant MSBuild private key access
     - name: Import PFX to Machine Store
-      run: certutil -user -p "${{ secrets.Pfx_Key }}" -importpfx "${{ env.Wap_Project_Directory }}\PermanentSigningCert.pfx" NoRoot
+      shell: powershell
+      run: |
+        $pfxPath = "${{ env.Wap_Project_Directory }}\PermanentSigningCert.pfx"
+        $password = "${{ secrets.Pfx_Key }}"
+        $flags = [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::PersistKeySet -bor `
+                 [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::UserKeySet -bor `
+                 [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable
+        
+        $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2
+        $cert.Import($pfxPath, $password, $flags)
+        
+        $store = New-Object System.Security.Cryptography.X509Certificates.X509Store("My", "CurrentUser")
+        $store.Open([System.Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
+        $store.Add($cert)
+        $store.Close()
 
-    # Publish and Sign (Now explicitly wiping out the hardcoded project thumbprint)
+    # Publish and Sign (Now pointing cleanly to the unlocked certificate store)
     - name: Publish MAUI Windows App
       run: dotnet publish ${{ env.Project_Path }} -c ${{ matrix.configuration }} -f net10.0-windows10.0.19041.0 -r win-x64 -p:GenerateAppxPackageOnBuild=true -p:AppxPackageSigningEnabled=true -p:PackageCertificateKeyFile=PermanentSigningCert.pfx -p:PackageCertificatePassword="${{ secrets.Pfx_Key }}" -p:PackageCertificateThumbprint="" -p:ApplicationDisplayVersion="${{ env.BASE_VERSION }}.${{ github.run_number }}" -p:ApplicationVersion=${{ github.run_number }}
 
