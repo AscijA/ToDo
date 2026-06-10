@@ -1,0 +1,57 @@
+name: .NET 10 MAUI Android CI
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        configuration: [Release]
+
+    runs-on: windows-latest
+
+    env:
+      Solution_Name: ToDo.slnx
+      Project_Path: ToDo.Maui.Android/ToDo.Maui.Android.csproj
+      Wap_Project_Directory: ToDo.Maui.Android
+      BASE_VERSION: "1.0"
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Install .NET 10
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 10.0.x
+
+    - name: Install MAUI Workload
+      run: dotnet workload install maui
+
+    # Decode your permanent Keystore directly into the Android project folder
+    - name: Decode the Keystore
+      run: |
+        $keystore_byte = [System.Convert]::FromBase64String("${{ secrets.Base64_Encoded_Keystore }}")
+        $keystorePath = Join-Path -Path $env:Wap_Project_Directory -ChildPath todo.keystore
+        [IO.File]::WriteAllBytes("$keystorePath", $keystore_byte)
+
+    # Publish and Sign the Android app (Pointing explicitly to the project-relative keystore)
+    - name: Publish MAUI Android App
+      run: dotnet publish ${{ env.Project_Path }} -c ${{ matrix.configuration }} -f net10.0-android -p:AndroidKeyStore=true -p:AndroidSigningKeyStore=todo.keystore -p:AndroidSigningKeyAlias="todo_alias" -p:AndroidSigningKeyPass="${{ secrets.Pfx_Key }}" -p:AndroidSigningStorePass="${{ secrets.Pfx_Key }}"
+
+    # Clean up the Keystore file from the project directory immediately after build
+    - name: Remove the Keystore
+      run: Remove-Item -path ${{ env.Wap_Project_Directory }}\todo.keystore -Force
+
+    # Upload both the production AAB and sideloadable APK files
+    - name: Upload Packaged Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ToDo-Android-App-Build-${{ github.run_number }}
+        path: "**/bin/Release/net10.0-android/publish/**"
