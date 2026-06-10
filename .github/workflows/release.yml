@@ -162,5 +162,5 @@ jobs:
         draft: false
         prerelease: false
         files: |
-          ./release-assets/ToDo-Windows.msix
-          ./release-assets/ToDo-Android.apk
+          ./release-assets/ToDo-Windows-v*.msix
+          ./release-assets/ToDo-Android-v*.apk
