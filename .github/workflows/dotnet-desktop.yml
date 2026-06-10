@@ -33,18 +33,22 @@ jobs:
     - name: Install MAUI Workload
       run: dotnet workload install maui
 
-    # Decode your permanent PFX from secrets onto the runner
+    # 1. Decode your permanent PFX from secrets onto the runner
     - name: Decode the PFX
       run: |
         $pfx_cert_byte = [System.Convert]::FromBase64String("${{ secrets.Base64_Encoded_Pfx }}")
         $certificatePath = Join-Path -Path $env:Wap_Project_Directory -ChildPath PermanentSigningCert.pfx
         [IO.File]::WriteAllBytes("$certificatePath", $pfx_cert_byte)
 
-    # Publish and Sign using your decoded PFX file (Flattened to avoid backtick syntax errors)
+    # 2. FIX: Import the certificate into the build machine store so MSBuild doesn't block it
+    - name: Import PFX to Machine Store
+      run: certutil -user -p "${{ secrets.Pfx_Key }}" -importpfx "${{ env.Wap_Project_Directory }}\PermanentSigningCert.pfx" NoRoot
+
+    # 3. Publish and Sign using your decoded PFX file
     - name: Publish MAUI Windows App
       run: dotnet publish ${{ env.Project_Path }} -c ${{ matrix.configuration }} -f net10.0-windows10.0.19041.0 -r win-x64 -p:GenerateAppxPackageOnBuild=true -p:AppxPackageSigningEnabled=true -p:PackageCertificateKeyFile=PermanentSigningCert.pfx -p:PackageCertificatePassword="${{ secrets.Pfx_Key }}"
 
-    # Clean up the PFX file immediately after build
+    # 4. Clean up the PFX file immediately after build
     - name: Remove the PFX
       run: Remove-Item -path $env:Wap_Project_Directory\PermanentSigningCert.pfx -Force
 
