@@ -83,7 +83,7 @@
 
 	<PropertyGroup>
 	  <PlatformTarget>x64</PlatformTarget>
-	  <PackageCertificateThumbprint>D33BE730F9947907B4650D0144DA251DBAEBDE48</PackageCertificateThumbprint>
+	  <PackageCertificateThumbprint>82A1D9CCB9896BBC0A6A91A7945C7F2172C0F30B</PackageCertificateThumbprint>
 	  <AppxPackageSigningEnabled>True</AppxPackageSigningEnabled>
 	  <GenerateAppInstallerFile>False</GenerateAppInstallerFile>
 	  <AppxPackageSigningTimestampDigestAlgorithm>SHA256</AppxPackageSigningTimestampDigestAlgorithm>
