@@ -1,15 +1,18 @@
 name: Build and Auto-Release MAUI Apps
 
 on:
-  workflow_dispatch: # ◄ Allows you to trigger this entire pipeline manually whenever you want
+  push:
+    branches: [ "release" ]
+  pull_request:
+    branches: [ "release" ]
+  workflow_dispatch: # Allows you to trigger this entire dual-platform process manually
 
-# Grants the workflow secure write permissions to publish releases automatically
 permissions:
   contents: write
 
 jobs:
   # ==========================================
-  # JOB 1: BUILD WINDOWS (MSIX)
+  # JOB 1: BUILD & SIGN WINDOWS (MSIX)
   # ==========================================
   build-windows:
     runs-on: windows-latest
@@ -43,17 +46,19 @@ jobs:
     - name: Sign MSIX Package via SignTool
       shell: powershell
       run: |
-        $msixFile = Get-ChildItem -Path "**/AppPackages/**/*.msix" -Recurse | Select-Object -First 1
+        # Using the exact explicit path that successfully worked in validation
+        $msixFile = Get-ChildItem -Path "${{ env.Wap_Project_Directory }}/bin/Release/net10.0-windows10.0.19041.0/win-x64/AppPackages/**/*.msix" -Recurse | Select-Object -First 1
         if (-not $msixFile) { throw "Could not find any compiled .msix file to sign." }
+        
         $signTool = Get-ChildItem -Path "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" | Select-Object -First 1
         & $signTool.FullName sign /f "${{ env.Wap_Project_Directory }}\PermanentSigningCert.pfx" /p "${{ secrets.Pfx_Key }}" /fd SHA256 /v $msixFile.FullName
-        # Make a copy of the MSIX out into the root workspace for easy collection later
+        
+        # Extract file up to the root workspace for the asset collection step
         Copy-Item -Path $msixFile.FullName -Destination "./ToDo-Windows.msix"
 
     - name: Remove the PFX
       run: Remove-Item -path $env:Wap_Project_Directory\PermanentSigningCert.pfx -Force
 
-    # Temporarily pass the signed installer over to the release job
     - name: Upload Windows Staging Binary
       uses: actions/upload-artifact@v4
       with:
@@ -61,7 +66,7 @@ jobs:
         path: ./ToDo-Windows.msix
 
   # ==========================================
-  # JOB 2: BUILD ANDROID (APK)
+  # JOB 2: BUILD & SIGN ANDROID (APK)
   # ==========================================
   build-android:
     runs-on: windows-latest
@@ -102,7 +107,6 @@ jobs:
     - name: Remove the Keystore
       run: Remove-Item -path ${{ env.Wap_Project_Directory }}\todo.keystore -Force
 
-    # Temporarily pass the signed APK over to the release job
     - name: Upload Android Staging Binary
       uses: actions/upload-artifact@v4
       with:
@@ -110,11 +114,11 @@ jobs:
         path: ./ToDo-Android.apk
 
   # ==========================================
-  # JOB 3: MERGE ARTIFACTS & CREATE RELEASE
+  # JOB 3: INTEGRATE ASSETS & CREATE RELEASE
   # ==========================================
   create-release:
     runs-on: ubuntu-latest
-    needs: [build-windows, build-android] # Ensures this only runs if BOTH compilations pass
+    needs: [build-windows, build-android] # Blocks until both platform compilations finish
     steps:
     - name: Download Windows Binary
       uses: actions/download-artifact@v4
@@ -134,11 +138,11 @@ jobs:
         tag_name: v1.0.${{ github.run_number }}
         name: Build Release v1.0.${{ github.run_number }}
         body: |
-          ### Automated Mobile and Desktop Build
-          This release contains the latest cross-platform build distributions for your project.
+          ### Cross-Platform Compiled Build Distribution
+          This release contains the latest matching binary components for your application.
           
-          * **Windows Installer:** `ToDo-Windows.msix`
-          * **Android Installer:** `ToDo-Android.apk`
+          * **Windows Platform (MSIX Desktop Installer):** `ToDo-Windows.msix`
+          * **Android Platform (Sideloadable APK Installer):** `ToDo-Android.apk`
         draft: false
         prerelease: false
         files: |
