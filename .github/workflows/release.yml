@@ -37,7 +37,7 @@ jobs:
   # 2. CALL THE BUILD WORKFLOW (Reuses the function file and passes the new version)
   trigger-shared-builds:
     needs: calculate-version
-    uses: ./.github/workflows/build-only.yml
+    uses: ./.github/workflows/build.yml
     with:
       explicit_version: ${{ needs.calculate-version.outputs.next_version }}
     secrets: inherit # Automatically passes keys/secrets over securely
