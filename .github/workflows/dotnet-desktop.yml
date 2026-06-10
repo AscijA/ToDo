@@ -41,29 +41,28 @@ jobs:
         $certificatePath = Join-Path -Path $env:Wap_Project_Directory -ChildPath PermanentSigningCert.pfx
         [IO.File]::WriteAllBytes("$certificatePath", $pfx_cert_byte)
 
-    # FIX: Import PFX via PowerShell with precise Key Storage Flags to grant MSBuild private key access
-    - name: Import PFX to Machine Store
+    # Build the package *without* letting MSBuild touch the signing logic
+    - name: Compile MAUI Windows App
+      run: dotnet publish ${{ env.Project_Path }} -c ${{ matrix.configuration }} -f net10.0-windows10.0.19041.0 -r win-x64 -p:GenerateAppxPackageOnBuild=true -p:AppxPackageSigningEnabled=false -p:ApplicationDisplayVersion="${{ env.BASE_VERSION }}.${{ github.run_number }}" -p:ApplicationVersion=${{ github.run_number }}
+
+    # Locate and sign the compiled .msix bundle directly via SignTool
+    - name: Sign MSIX Package via SignTool
       shell: powershell
       run: |
-        $pfxPath = "${{ env.Wap_Project_Directory }}\PermanentSigningCert.pfx"
-        $password = "${{ secrets.Pfx_Key }}"
-        $flags = [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::PersistKeySet -bor `
-                 [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::UserKeySet -bor `
-                 [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable
+        # Find the generated installer package
+        $msixFile = Get-ChildItem -Path "**/AppPackages/**/*.msix" -Recurse | Select-Object -First 1
+        if (-not $msixFile) { throw "Could not find any compiled .msix file to sign." }
         
-        $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2
-        $cert.Import($pfxPath, $password, $flags)
+        Write-Host "Found target bundle: $($msixFile.FullName)"
         
-        $store = New-Object System.Security.Cryptography.X509Certificates.X509Store("My", "CurrentUser")
-        $store.Open([System.Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
-        $store.Add($cert)
-        $store.Close()
+        # Locate the Windows SDK SignTool executable on the GitHub runner
+        $signTool = Get-ChildItem -Path "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" | Select-Object -First 1
+        if (-not $signTool) { throw "SignTool.exe could not be located on this runner." }
+        
+        # Execute production file signing explicitly
+        & $signTool.FullName sign /f "${{ env.Wap_Project_Directory }}\PermanentSigningCert.pfx" /p "${{ secrets.Pfx_Key }}" /fd SHA256 /v $msixFile.FullName
 
-    # Publish and Sign (Now pointing cleanly to the unlocked certificate store)
-    - name: Publish MAUI Windows App
-      run: dotnet publish ${{ env.Project_Path }} -c ${{ matrix.configuration }} -f net10.0-windows10.0.19041.0 -r win-x64 -p:GenerateAppxPackageOnBuild=true -p:AppxPackageSigningEnabled=true -p:PackageCertificateKeyFile=PermanentSigningCert.pfx -p:PackageCertificatePassword="${{ secrets.Pfx_Key }}" -p:PackageCertificateThumbprint="" -p:ApplicationDisplayVersion="${{ env.BASE_VERSION }}.${{ github.run_number }}" -p:ApplicationVersion=${{ github.run_number }}
-
-    # Clean up the PFX file immediately after build
+    # Clean up the PFX file immediately after signing
     - name: Remove the PFX
       run: Remove-Item -path $env:Wap_Project_Directory\PermanentSigningCert.pfx -Force
 
