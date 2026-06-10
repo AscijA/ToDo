@@ -5,6 +5,7 @@ on:
     branches: [ "master" ]
   pull_request:
     branches: [ "master" ]
+  workflow_dispatch: # Allows you to trigger this build manually
 
 jobs:
   build:
@@ -41,16 +42,16 @@ jobs:
         $certificatePath = Join-Path -Path $env:Wap_Project_Directory -ChildPath PermanentSigningCert.pfx
         [IO.File]::WriteAllBytes("$certificatePath", $pfx_cert_byte)
 
-    # Build the package *without* letting MSBuild touch the signing logic
+    # Build the package without letting MSBuild handle the signing validation
     - name: Compile MAUI Windows App
       run: dotnet publish ${{ env.Project_Path }} -c ${{ matrix.configuration }} -f net10.0-windows10.0.19041.0 -r win-x64 -p:GenerateAppxPackageOnBuild=true -p:AppxPackageSigningEnabled=false -p:ApplicationDisplayVersion="${{ env.BASE_VERSION }}.${{ github.run_number }}" -p:ApplicationVersion=${{ github.run_number }}
 
-    # Locate and sign the compiled .msix bundle directly via SignTool
+    # Locate and sign the compiled .msix bundle directly using the fixed explicit path
     - name: Sign MSIX Package via SignTool
       shell: powershell
       run: |
-        # Find the generated installer package
-        $msixFile = Get-ChildItem -Path "**/AppPackages/**/*.msix" -Recurse | Select-Object -First 1
+        # Explicit path targeting to point exactly to the output folder from your logs
+        $msixFile = Get-ChildItem -Path "${{ env.Wap_Project_Directory }}/bin/Release/net10.0-windows10.0.19041.0/win-x64/AppPackages/**/*.msix" -Recurse | Select-Object -First 1
         if (-not $msixFile) { throw "Could not find any compiled .msix file to sign." }
         
         Write-Host "Found target bundle: $($msixFile.FullName)"
@@ -66,6 +67,7 @@ jobs:
     - name: Remove the PFX
       run: Remove-Item -path $env:Wap_Project_Directory\PermanentSigningCert.pfx -Force
 
+    # Upload the newly signed MSIX package
     - name: Upload Packaged Artifacts
       uses: actions/upload-artifact@v4
       with:
