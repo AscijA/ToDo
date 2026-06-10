@@ -5,9 +5,13 @@ namespace ToDo.RazorLib.Services;
 
 public sealed class SyncSnapshotService : ISyncSnapshotService {
     private readonly IDbContextFactory<TodoDbContext> contextFactory;
+    private readonly SyncChangeTracker changeTracker;
 
-    public SyncSnapshotService(IDbContextFactory<TodoDbContext> contextFactory) {
+    public SyncSnapshotService(
+        IDbContextFactory<TodoDbContext> contextFactory,
+        SyncChangeTracker changeTracker) {
         this.contextFactory = contextFactory;
+        this.changeTracker = changeTracker;
     }
 
     public async Task<SyncSnapshotResponse> CreateSnapshotAsync(
@@ -20,7 +24,8 @@ public sealed class SyncSnapshotService : ISyncSnapshotService {
             .Select(task => new SyncTaskDefinitionSnapshot(
                 task.Id,
                 task.Title,
-                task.Description))
+                task.Description,
+                changeTracker.GetLastModified(task.Id)))
             .ToListAsync(cancellationToken);
 
         var taskLists = await context.TaskLists
@@ -29,7 +34,9 @@ public sealed class SyncSnapshotService : ISyncSnapshotService {
                 list.Id,
                 list.Name,
                 list.Color,
-                list.Description))
+                list.Description,
+                list.Position,
+                changeTracker.GetLastModified(list.Id)))
             .ToListAsync(cancellationToken);
 
         var taskListItems = await context.TaskListItems
@@ -39,7 +46,8 @@ public sealed class SyncSnapshotService : ISyncSnapshotService {
                 item.TaskDefinitionId,
                 item.TaskListId,
                 item.IsDone,
-                item.Position))
+                item.Position,
+                changeTracker.GetLastModified(item.Id)))
             .ToListAsync(cancellationToken);
 
         var dailyOccurrences = await context.DailyOccurrences
@@ -52,7 +60,8 @@ public sealed class SyncSnapshotService : ISyncSnapshotService {
                 occurrence.DailyPlan.Date,
                 occurrence.IsDone,
                 occurrence.Timeslot,
-                occurrence.SortOrder))
+                occurrence.SortOrder,
+                changeTracker.GetLastModified(occurrence.Id)))
             .ToListAsync(cancellationToken);
 
         var weeklyOccurrences = await context.WeeklyOccurrences
@@ -64,7 +73,8 @@ public sealed class SyncSnapshotService : ISyncSnapshotService {
                 occurrence.WeeklyPlanId,
                 occurrence.WeeklyPlan.Date,
                 occurrence.IsDone,
-                occurrence.DayOfWeek))
+                occurrence.DayOfWeek,
+                changeTracker.GetLastModified(occurrence.Id)))
             .ToListAsync(cancellationToken);
 
         var monthlyOccurrences = await context.MonthlyOccurrences
@@ -76,7 +86,8 @@ public sealed class SyncSnapshotService : ISyncSnapshotService {
                 occurrence.MonthlyPlanId,
                 occurrence.MonthlyPlan.Date,
                 occurrence.IsDone,
-                occurrence.DayOfMonth))
+                occurrence.DayOfMonth,
+                changeTracker.GetLastModified(occurrence.Id)))
             .ToListAsync(cancellationToken);
 
         return new SyncSnapshotResponse(

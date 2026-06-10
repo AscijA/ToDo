@@ -13,10 +13,24 @@
 					</MudText>
 				</MudStack>
 
+				<MudButton StartIcon="@Icons.Material.Filled.Sync"
+						   Color="Color.Primary"
+						   Variant="Variant.Text"
+						   Disabled="@IsBusy"
+						   FullWidth="true"
+						   Class="justify-start"
+						   OnClick="SyncNowAsync">
+					@if (_isSyncing) {
+						<MudProgressCircular Size="Size.Small" Indeterminate="true" />
+					}
+					else {
+						<span>Sync Now</span>
+					}
+				</MudButton>
 				<MudButton StartIcon="@Icons.Material.Filled.NetworkPing"
 						   Color="Color.Primary"
 						   Variant="Variant.Text"
-						   Disabled="@_isPinging"
+						   Disabled="@IsBusy"
 						   FullWidth="true"
 						   Class="justify-start"
 						   OnClick="PingAsync">
@@ -30,7 +44,7 @@
 				<MudButton StartIcon="@Icons.Material.Filled.Inventory"
 						   Color="Color.Primary"
 						   Variant="Variant.Text"
-						   Disabled="@_isFetchingSnapshot"
+						   Disabled="@IsBusy"
 						   FullWidth="true"
 						   Class="justify-start"
 						   OnClick="FetchSnapshotAsync">
@@ -44,7 +58,7 @@
 				<MudButton StartIcon="@Icons.Material.Filled.Visibility"
 						   Color="Color.Primary"
 						   Variant="Variant.Text"
-						   Disabled="@_isPreviewing"
+						   Disabled="@IsBusy"
 						   FullWidth="true"
 						   Class="justify-start"
 						   OnClick="PreviewAsync">
@@ -58,7 +72,7 @@
 				<MudButton StartIcon="@Icons.Material.Filled.Download"
 						   Color="Color.Primary"
 						   Variant="Variant.Text"
-						   Disabled="@_isImporting"
+						   Disabled="@IsBusy"
 						   FullWidth="true"
 						   Class="justify-start"
 						   OnClick="ImportRemoteNewAsync">
@@ -102,14 +116,39 @@
 	private bool _isFetchingSnapshot;
 	private bool _isPreviewing;
 	private bool _isImporting;
+	private bool _isSyncing;
 	private string? _message;
 	private Severity _messageSeverity = Severity.Info;
+	private bool IsBusy => _isPinging || _isFetchingSnapshot || _isPreviewing || _isImporting || _isSyncing;
 
 	private void Cancel() => MudDialog.Cancel();
 
 	private void HandleKeyDown(KeyboardEventArgs args) {
 		if (args.Key == "Escape") {
 			Cancel();
+		}
+	}
+
+	private async Task SyncNowAsync() {
+		_message = null;
+		_isSyncing = true;
+
+		try {
+			var push = await SyncService.PushLocalNewAsync(Device);
+			var import = await SyncService.ImportRemoteNewAsync(Device);
+			_messageSeverity = push.SkippedCount == 0 && import.SkippedCount == 0
+				? Severity.Success
+				: Severity.Warning;
+			_message = FormatSyncNowMessage(push, import);
+			await OnDevicesChanged.InvokeAsync();
+		}
+		catch (Exception ex) {
+			_messageSeverity = Severity.Warning;
+			_message = SyncUserMessages.Explain(ex);
+			await OnDevicesChanged.InvokeAsync();
+		}
+		finally {
+			_isSyncing = false;
 		}
 	}
 
@@ -235,5 +274,9 @@
 		}
 
 		return $"{import.DeviceName} import: {import.ImportedCount} imported, {import.SkippedCount} skipped. {details}.";
+	}
+
+	private static string FormatSyncNowMessage(SyncImportSummary push, SyncImportSummary import) {
+		return $"Sync complete. Sent {push.ImportedCount} new item(s) to {push.DeviceName}; received {import.ImportedCount} new item(s) from {import.DeviceName}.";
 	}
 }

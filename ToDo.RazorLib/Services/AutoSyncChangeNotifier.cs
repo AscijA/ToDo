@@ -7,6 +7,7 @@ public sealed class AutoSyncChangeNotifier : IDataChangeNotifier, IDisposable {
     private static readonly TimeSpan DebounceDelay = TimeSpan.FromSeconds(2);
 
     private readonly ISyncService syncService;
+    private readonly SyncChangeTracker changeTracker;
     private readonly ILogger<AutoSyncChangeNotifier>? logger;
     private readonly object gate = new();
     private readonly SemaphoreSlim syncLock = new(1, 1);
@@ -15,8 +16,10 @@ public sealed class AutoSyncChangeNotifier : IDataChangeNotifier, IDisposable {
 
     public AutoSyncChangeNotifier(
         ISyncService syncService,
+        SyncChangeTracker changeTracker,
         ILogger<AutoSyncChangeNotifier>? logger = null) {
         this.syncService = syncService;
+        this.changeTracker = changeTracker;
         this.logger = logger;
     }
 
@@ -24,6 +27,8 @@ public sealed class AutoSyncChangeNotifier : IDataChangeNotifier, IDisposable {
         if (disposed) {
             return;
         }
+
+        changeTracker.MarkLocalChange();
 
         var identity = syncService.GetLocalDevice();
         if (!identity.SyncEnabled || !identity.AutoSyncOnChanges || syncService.GetPairedDevices().Count == 0) {

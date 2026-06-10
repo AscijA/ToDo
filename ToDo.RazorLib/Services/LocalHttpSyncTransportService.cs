@@ -408,7 +408,7 @@ public sealed class LocalHttpSyncTransportService : ISyncTransportService {
         AddOrReplacePairedDevice(LoadPairedDevices()
             .First(device => string.Equals(device.DeviceId, request.DeviceId, StringComparison.OrdinalIgnoreCase))
             with { LastSyncedAt = DateTimeOffset.Now, IsOnline = true });
-        await WriteJsonResponseAsync(stream, import, cancellationToken);
+        await WriteJsonResponseAsync(stream, import with { DeviceName = identity.DeviceName }, cancellationToken);
     }
 
     private async Task<bool> TryAuthorizePairedDeviceAsync(

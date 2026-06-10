@@ -148,20 +148,24 @@ public sealed record SyncEntityImportCount(
 public sealed record SyncTaskDefinitionSnapshot(
     Guid Id,
     string Title,
-    string Description);
+    string Description,
+    DateTimeOffset LastModifiedAt);
 
 public sealed record SyncTaskListSnapshot(
     Guid Id,
     string Name,
     string Color,
-    string? Description);
+    string? Description,
+    int Position,
+    DateTimeOffset LastModifiedAt);
 
 public sealed record SyncTaskListItemSnapshot(
     Guid Id,
     Guid TaskDefinitionId,
     Guid TaskListId,
     bool IsDone,
-    int Position);
+    int Position,
+    DateTimeOffset LastModifiedAt);
 
 public sealed record SyncDailyOccurrenceSnapshot(
     Guid Id,
@@ -170,7 +174,8 @@ public sealed record SyncDailyOccurrenceSnapshot(
     DateOnly Date,
     bool IsDone,
     string? Timeslot,
-    int SortOrder);
+    int SortOrder,
+    DateTimeOffset LastModifiedAt);
 
 public sealed record SyncWeeklyOccurrenceSnapshot(
     Guid Id,
@@ -178,7 +183,8 @@ public sealed record SyncWeeklyOccurrenceSnapshot(
     Guid WeeklyPlanId,
     DateOnly WeekStart,
     bool IsDone,
-    DayOfWeek? DayOfWeek);
+    DayOfWeek? DayOfWeek,
+    DateTimeOffset LastModifiedAt);
 
 public sealed record SyncMonthlyOccurrenceSnapshot(
     Guid Id,
@@ -186,7 +192,8 @@ public sealed record SyncMonthlyOccurrenceSnapshot(
     Guid MonthlyPlanId,
     DateOnly MonthStart,
     bool IsDone,
-    int? DayOfMonth);
+    int? DayOfMonth,
+    DateTimeOffset LastModifiedAt);
 
 public sealed record IncomingPairingRequest(
     string SessionId,
