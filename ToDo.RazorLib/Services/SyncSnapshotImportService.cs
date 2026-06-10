@@ -8,9 +8,13 @@ namespace ToDo.RazorLib.Services;
 
 public sealed class SyncSnapshotImportService : ISyncSnapshotImportService {
     private readonly IDbContextFactory<TodoDbContext> contextFactory;
+    private readonly SyncDataRefreshService syncDataRefresh;
 
-    public SyncSnapshotImportService(IDbContextFactory<TodoDbContext> contextFactory) {
+    public SyncSnapshotImportService(
+        IDbContextFactory<TodoDbContext> contextFactory,
+        SyncDataRefreshService syncDataRefresh) {
         this.contextFactory = contextFactory;
+        this.syncDataRefresh = syncDataRefresh;
     }
 
     public async Task<SyncImportSummary> ImportNewAsync(
@@ -145,7 +149,12 @@ public sealed class SyncSnapshotImportService : ISyncSnapshotImportService {
         await context.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
-        return new SyncImportSummary(snapshot.DeviceName, importCounts);
+        var import = new SyncImportSummary(snapshot.DeviceName, importCounts);
+        if (import.ImportedCount > 0) {
+            syncDataRefresh.NotifyChanged();
+        }
+
+        return import;
     }
 
     private static async Task<Dictionary<DateOnly, Guid>> GetPlanIdsByDateAsync<TPlan>(

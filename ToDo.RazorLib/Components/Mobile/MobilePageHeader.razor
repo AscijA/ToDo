@@ -1,10 +1,14 @@
-<div class="mobile-page-header">
+<div class="@GetHeaderClass()"
+     role="@GetHeaderRole()"
+     tabindex="@GetHeaderTabIndex()"
+     @onclick="HandleHeaderClick"
+     @onkeydown="HandleHeaderKeyDown">
    @if (ShowBackButton) {
       <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
                      aria-label="Back"
                      Color="Color.Primary"
                      Size="Size.Small"
-                     OnClick="OnBack" />
+                     tabindex="-1" />
    }
    else if (!string.IsNullOrEmpty(Icon)) {
       <MudIconButton Icon="@Icon" Size="Size.Small" Color="Color.Secondary" OnClick="() => { }" Ripple="false"/>
@@ -24,4 +28,24 @@
 
    [Parameter]
    public EventCallback OnBack { get; set; }
+
+   private string GetHeaderClass() => ShowBackButton
+      ? "mobile-page-header mobile-page-header-clickable"
+      : "mobile-page-header";
+
+   private string? GetHeaderRole() => ShowBackButton ? "button" : null;
+
+   private int? GetHeaderTabIndex() => ShowBackButton ? 0 : null;
+
+   private async Task HandleHeaderClick() {
+      if (ShowBackButton) {
+         await OnBack.InvokeAsync();
+      }
+   }
+
+   private async Task HandleHeaderKeyDown(KeyboardEventArgs args) {
+      if (ShowBackButton && (args.Key == "Enter" || args.Key == " ")) {
+         await OnBack.InvokeAsync();
+      }
+   }
 }

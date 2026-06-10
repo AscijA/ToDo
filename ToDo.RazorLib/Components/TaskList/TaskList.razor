@@ -1,6 +1,7 @@
 @inject ITaskListService ListService
 @inject IDialogService DialogService
 @inject IJSRuntime JSRuntime
+@inject SyncDataRefreshService SyncDataRefresh
 @using Microsoft.JSInterop
 @using ToDo.Application.Contracts.DTOs
 @using ToDo.RazorLib.Components.TaskList
@@ -62,6 +63,8 @@
     private bool shouldAttachReorder;
 
     protected override async Task OnParametersSetAsync() {
+        SyncDataRefresh.RefreshRequested -= OnSyncDataRefreshRequested;
+        SyncDataRefresh.RefreshRequested += OnSyncDataRefreshRequested;
         await LoadListAsync();
     }
 
@@ -95,6 +98,14 @@
         newItem = new(Guid.Empty, Guid.Empty, "", false, 0);
         newItemKey = Guid.NewGuid();
         await LoadListAsync();
+    }
+
+    private void OnSyncDataRefreshRequested() {
+        _ = InvokeAsync(async () => {
+            shouldAutoFocus = false;
+            await LoadListAsync();
+            StateHasChanged();
+        });
     }
 
     [JSInvokable]
@@ -143,6 +154,8 @@
     }
 
     public async ValueTask DisposeAsync() {
+        SyncDataRefresh.RefreshRequested -= OnSyncDataRefreshRequested;
+
         if (reorderInstance != null) {
             await reorderInstance.InvokeVoidAsync("dispose");
             await reorderInstance.DisposeAsync();

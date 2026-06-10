@@ -10,6 +10,7 @@
 @inject ISettingsService SettingsService
 @inject IJSRuntime JSRuntime
 @inject SyncModalRequestService SyncModalRequests
+@inject SyncDataRefreshService SyncDataRefresh
 @inject ThemeStoreInterop ThemeStore
 @implements IAsyncDisposable
 
@@ -75,6 +76,7 @@
 
    protected override async Task OnInitializedAsync() {
       SyncModalRequests.OpenRequested += OnSyncModalRequested;
+      SyncDataRefresh.RefreshRequested += OnSyncDataRefreshRequested;
       LoadSettings();
       await LoadTaskLists();
    }
@@ -229,8 +231,16 @@
       StateHasChanged();
    }
 
+   private void OnSyncDataRefreshRequested() {
+      _ = InvokeAsync(async () => {
+         await LoadTaskLists();
+         StateHasChanged();
+      });
+   }
+
    public async ValueTask DisposeAsync() {
       SyncModalRequests.OpenRequested -= OnSyncModalRequested;
+      SyncDataRefresh.RefreshRequested -= OnSyncDataRefreshRequested;
       if (_reorderInstance != null) {
          await _reorderInstance.InvokeVoidAsync("dispose");
          await _reorderInstance.DisposeAsync();

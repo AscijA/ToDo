@@ -1,5 +1,7 @@
 @inject IDailyPlanService TaskService
 @inject ISettingsService SettingsService
+@inject SyncDataRefreshService SyncDataRefresh
+@implements IDisposable
 
 <PlannerDateHeader Title="@($"Week {GetWeekNumber(Date)} - {Date:dd.MM.yyyy}")"
 					  SelectedDate="selectedDateTime"
@@ -32,6 +34,7 @@
 	private bool shouldAutoFocus;
 
 	protected override async Task OnInitializedAsync() {
+		SyncDataRefresh.RefreshRequested += OnSyncDataRefreshRequested;
 		var savedDateStr = SettingsService.Get(DatePrefKey, string.Empty);
 		if (!string.IsNullOrEmpty(savedDateStr) && DateOnly.TryParse(savedDateStr, out var parsedDate)) {
 			Date = GetWeekStart(parsedDate);
@@ -81,6 +84,18 @@
 		selectedDateTime = Date.ToDateTime(new TimeOnly(0, 0));
 		SettingsService.Set(DatePrefKey, Date.ToString("yyyy-MM-dd"));
 		await LoadTasksAsync();
+	}
+
+	private void OnSyncDataRefreshRequested() {
+		_ = InvokeAsync(async () => {
+			shouldAutoFocus = false;
+			await LoadTasksAsync();
+			StateHasChanged();
+		});
+	}
+
+	public void Dispose() {
+		SyncDataRefresh.RefreshRequested -= OnSyncDataRefreshRequested;
 	}
 
 	private static DateOnly GetWeekStart(DateOnly date) {

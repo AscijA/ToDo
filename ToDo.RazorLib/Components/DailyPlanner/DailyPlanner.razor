@@ -1,5 +1,7 @@
-﻿@inject IDailyPlanService TaskService
+@inject IDailyPlanService TaskService
 @inject ISettingsService SettingsService
+@inject SyncDataRefreshService SyncDataRefresh
+@implements IDisposable
 
 <PlannerDateHeader Title="@Date.ToString("dddd, dd.MM.yyyy")"
 					  SelectedDate="selectedDateTime"
@@ -35,6 +37,7 @@
 	private bool shouldAutoFocus = false;
 
 	protected override async Task OnInitializedAsync() {
+		SyncDataRefresh.RefreshRequested += OnSyncDataRefreshRequested;
 		string savedDateStr = SettingsService.Get(DatePrefKey, string.Empty);
 
 		if (!string.IsNullOrEmpty(savedDateStr) && DateOnly.TryParse(savedDateStr, out var parsedDate)) {
@@ -90,5 +93,15 @@
 		await LoadTasksAsync();
 	}
 
+	private void OnSyncDataRefreshRequested() {
+		_ = InvokeAsync(async () => {
+			shouldAutoFocus = false;
+			await LoadTasksAsync();
+			StateHasChanged();
+		});
+	}
 
+	public void Dispose() {
+		SyncDataRefresh.RefreshRequested -= OnSyncDataRefreshRequested;
+	}
 }

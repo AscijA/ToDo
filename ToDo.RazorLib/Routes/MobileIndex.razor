@@ -11,6 +11,7 @@
 @inject IDialogService DialogService
 @inject ISettingsService SettingsService
 @inject SyncModalRequestService SyncModalRequests
+@inject SyncDataRefreshService SyncDataRefresh
 @inject ThemeStoreInterop ThemeStore
 @implements IDisposable
 
@@ -70,6 +71,7 @@
 
     protected override async Task OnInitializedAsync() {
         SyncModalRequests.OpenRequested += OnSyncModalRequested;
+        SyncDataRefresh.RefreshRequested += OnSyncDataRefreshRequested;
         LoadSettings();
         await LoadTaskLists();
     }
@@ -196,6 +198,13 @@
         StateHasChanged();
     }
 
+    private void OnSyncDataRefreshRequested() {
+        _ = InvokeAsync(async () => {
+            await LoadTaskLists();
+            StateHasChanged();
+        });
+    }
+
     private string GetIconLetter(string name) =>
         string.IsNullOrWhiteSpace(name) ? "?" : name.Trim()[0].ToString().ToUpperInvariant();
 
@@ -223,5 +232,6 @@
 
     public void Dispose() {
         SyncModalRequests.OpenRequested -= OnSyncModalRequested;
+        SyncDataRefresh.RefreshRequested -= OnSyncDataRefreshRequested;
     }
 }
