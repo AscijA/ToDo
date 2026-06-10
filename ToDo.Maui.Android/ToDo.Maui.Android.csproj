@@ -11,20 +11,21 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<EnableDefaultCssItems>false</EnableDefaultCssItems>
 		<Nullable>enable</Nullable>
-
 		<ApplicationTitle>To Do</ApplicationTitle>
 		<ApplicationId>ba.ascija.todo.maui.android</ApplicationId>
-		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
-		<ApplicationVersion>1</ApplicationVersion>
-
 		<SupportedOSPlatformVersion>24.0</SupportedOSPlatformVersion>
 		<AndroidUseLegacyIconGeneration>false</AndroidUseLegacyIconGeneration>
 	</PropertyGroup>
+	<PropertyGroup>
+		<SemanticBuildVersion Condition="'$(SEMVER)' != ''">$(SEMVER)</SemanticBuildVersion>
+		<SemanticBuildVersion Condition="'$(SEMVER)' == ''">1.0.1</SemanticBuildVersion>
 
-	<PropertyGroup Condition="'$(Configuration)' == 'Release'">
-		<AndroidPackageFormats>apk</AndroidPackageFormats>
+		<ApplicationDisplayVersion>$(SemanticBuildVersion)</ApplicationDisplayVersion>
+		<ApplicationVersion Condition="'$(BUILD_NUMBER)' != ''">$(BUILD_NUMBER)</ApplicationVersion>
+		<ApplicationVersion Condition="'$(BUILD_NUMBER)' == ''">1</ApplicationVersion>
+
+		<Version>$(SemanticBuildVersion).0</Version>
 	</PropertyGroup>
-
 	<ItemGroup>
 		<MauiIcon Include="Resources\AppIcon\appicon.png" BaseSize="128,128" Color="#000000" ForegroundScale="0.65" />
 

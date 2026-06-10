@@ -1,0 +1,80 @@
+name: Manual Production Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  calculate-version:
+    runs-on: ubuntu-latest
+    outputs:
+      next_version: ${{ steps.bump.outputs.next }}
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Fetch Latest Release Tag
+      id: latest_tag
+      uses: actions-ecosystem/action-get-latest-tag@v1
+      with:
+        with_initial_version: true
+        initial_version: v1.0.0
+
+    - name: Compute Next Minor Value
+      id: bump
+      run: |
+        RAW_TAG="${{ steps.latest_tag.outputs.tag }}"
+        CLEAN_TAG=${RAW_TAG#v}
+        
+        MAJOR=$(echo $CLEAN_TAG | cut -d. -f1)
+        MINOR=$(echo $CLEAN_TAG | cut -d. -f2)
+        
+        NEXT_MINOR=$((MINOR + 1))
+        NEXT_VERSION="$MAJOR.$NEXT_MINOR.0"
+        
+        echo "next=$NEXT_VERSION" >> $GITHUB_OUTPUT
+
+  # CHANGED: Reuses the newly named build.yml file as the template function engine
+  trigger-shared-builds:
+    needs: calculate-version
+    uses: ./.github/workflows/build.yml
+    with:
+      explicit_version: ${{ needs.calculate-version.outputs.next_version }}
+    secrets: inherit
+
+  create-release:
+    runs-on: ubuntu-latest
+    needs: [calculate-version, trigger-shared-builds]
+    steps:
+    - name: Download Windows Binary
+      uses: actions/download-artifact@v4
+      with:
+        name: windows-binary
+        path: ./release-assets
+
+    - name: Download Android Binary
+      uses: actions/download-artifact@v4
+      with:
+        name: android-binary
+        path: ./release-assets
+
+    - name: Create Production Tag and Release Entry
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: v${{ needs.calculate-version.outputs.next_version }}
+        name: Build Release v${{ needs.calculate-version.outputs.next_version }}
+        body: |
+          ### Production Build Release v${{ needs.calculate-version.outputs.next_version }}
+          This deployment automatically increments the Minor build version tracking index.
+          
+          * **Windows Installer:** `ToDo-Windows-v${{ needs.calculate-version.outputs.next_version }}.msix`
+          * **Android Installer:** `ToDo-Android-v${{ needs.calculate-version.outputs.next_version }}.apk`
+        draft: false
+        prerelease: false
+        files: |
+          ./release-assets/ToDo-Windows-v*.msix
+          ./release-assets/ToDo-Android-v*.apk
