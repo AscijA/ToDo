@@ -2,10 +2,10 @@ name: Build and Auto-Release MAUI Apps
 
 on:
   push:
-    branches: [ "release" ]
+    branches: [ "master" ]
   pull_request:
-    branches: [ "release" ]
-  workflow_dispatch: # Allows you to trigger this entire dual-platform process manually
+    branches: [ "master" ]
+  workflow_dispatch: 
 
 permissions:
   contents: write
@@ -19,12 +19,11 @@ jobs:
     env:
       Project_Path: ToDo.Maui.Windows/ToDo.Maui.Windows.csproj
       Wap_Project_Directory: ToDo.Maui.Windows
-      BASE_VERSION: "1.0"
     steps:
     - name: Checkout
       uses: actions/checkout@v4
       with:
-        fetch-depth: 0
+        fetch-depth: 0 # CRITICAL: SemVer tools require the full history graph to calculate versions
 
     - name: Install .NET 10
       uses: actions/setup-dotnet@v4
@@ -34,26 +33,28 @@ jobs:
     - name: Install MAUI Workload
       run: dotnet workload install maui
 
+    # Calculate Semantic Version dynamically from your Git commits
+    - name: Calculate Semantic Version
+      uses: dotnet/nbgv@master
+      id: nbgv
+
     - name: Decode the PFX
       run: |
         $pfx_cert_byte = [System.Convert]::FromBase64String("${{ secrets.Base64_Encoded_Pfx }}")
         $certificatePath = Join-Path -Path $env:Wap_Project_Directory -ChildPath PermanentSigningCert.pfx
         [IO.File]::WriteAllBytes("$certificatePath", $pfx_cert_byte)
 
+    # Pass the extracted SemVer string properties cleanly into the compiler flags
     - name: Compile MAUI Windows App
-      run: dotnet publish ${{ env.Project_Path }} -c Release -f net10.0-windows10.0.19041.0 -r win-x64 -p:GenerateAppxPackageOnBuild=true -p:AppxPackageSigningEnabled=false -p:ApplicationDisplayVersion="${{ env.BASE_VERSION }}.${{ github.run_number }}" -p:ApplicationVersion=${{ github.run_number }}
+      run: dotnet publish ${{ env.Project_Path }} -c Release -f net10.0-windows10.0.19041.0 -r win-x64 -p:GenerateAppxPackageOnBuild=true -p:AppxPackageSigningEnabled=false -p:SEMVER="${{ steps.nbgv.outputs.SimpleVersion }}" -p:BUILD_NUMBER=${{ steps.nbgv.outputs.GitCommitIdHeight }}
 
     - name: Sign MSIX Package via SignTool
       shell: powershell
       run: |
-        # Using the exact explicit path that successfully worked in validation
         $msixFile = Get-ChildItem -Path "${{ env.Wap_Project_Directory }}/bin/Release/net10.0-windows10.0.19041.0/win-x64/AppPackages/**/*.msix" -Recurse | Select-Object -First 1
         if (-not $msixFile) { throw "Could not find any compiled .msix file to sign." }
-        
         $signTool = Get-ChildItem -Path "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" | Select-Object -First 1
         & $signTool.FullName sign /f "${{ env.Wap_Project_Directory }}\PermanentSigningCert.pfx" /p "${{ secrets.Pfx_Key }}" /fd SHA256 /v $msixFile.FullName
-        
-        # Extract file up to the root workspace for the asset collection step
         Copy-Item -Path $msixFile.FullName -Destination "./ToDo-Windows.msix"
 
     - name: Remove the PFX
@@ -73,7 +74,6 @@ jobs:
     env:
       Project_Path: ToDo.Maui.Android/ToDo.Maui.Android.csproj
       Wap_Project_Directory: ToDo.Maui.Android
-      BASE_VERSION: "1.0"
     steps:
     - name: Checkout
       uses: actions/checkout@v4
@@ -88,19 +88,25 @@ jobs:
     - name: Install MAUI Workload
       run: dotnet workload install maui
 
+    # Calculate Semantic Version dynamically from your Git commits
+    - name: Calculate Semantic Version
+      uses: dotnet/nbgv@master
+      id: nbgv
+
     - name: Decode the Keystore
       run: |
         $keystore_byte = [System.Convert]::FromBase64String("${{ secrets.Base64_Encoded_Keystore }}")
         $keystorePath = Join-Path -Path $env:Wap_Project_Directory -ChildPath todo.keystore
         [IO.File]::WriteAllBytes("$keystorePath", $keystore_byte)
 
+    # Pass the calculated values directly into the Android package signing properties
     - name: Publish MAUI Android App
-      run: dotnet publish ${{ env.Project_Path }} -c Release -f net10.0-android -p:AndroidKeyStore=true -p:AndroidSigningKeyStore=todo.keystore -p:AndroidSigningKeyAlias="todo_alias" -p:AndroidSigningKeyPass="${{ secrets.Pfx_Key }}" -p:AndroidSigningStorePass="${{ secrets.Pfx_Key }}" -p:ApplicationDisplayVersion="${{ env.BASE_VERSION }}.${{ github.run_number }}" -p:ApplicationVersion=${{ github.run_number }}
+      run: dotnet publish ${{ env.Project_Path }} -c Release -f net10.0-android -p:AndroidKeyStore=true -p:AndroidSigningKeyStore=todo.keystore -p:AndroidSigningKeyAlias="todo_alias" -p:AndroidSigningKeyPass="${{ secrets.Pfx_Key }}" -p:AndroidSigningStorePass="${{ secrets.Pfx_Key }}" -p:SEMVER="${{ steps.nbgv.outputs.SimpleVersion }}" -p:BUILD_NUMBER=${{ steps.nbgv.outputs.GitCommitIdHeight }}
 
     - name: Locate and Stage Android APK
       shell: powershell
       run: |
-        $apkFile = Get-ChildItem -Path "**/bin/Release/net10.0-android/publish/*-signed.apk" -Recurse | Select-Object -First 1
+        $apkFile = Get-ChildItem -Path "${{ env.Wap_Project_Directory }}/bin/Release/net10.0-android/publish/*-signed.apk" -Recurse | Select-Object -First 1
         if (-not $apkFile) { throw "Could not find signed APK." }
         Copy-Item -Path $apkFile.FullName -Destination "./ToDo-Android.apk"
 
@@ -114,12 +120,21 @@ jobs:
         path: ./ToDo-Android.apk
 
   # ==========================================
-  # JOB 3: INTEGRATE ASSETS & CREATE RELEASE
+  # JOB 3: MERGE ARTIFACTS & CREATE RELEASE
   # ==========================================
   create-release:
     runs-on: ubuntu-latest
-    needs: [build-windows, build-android] # Blocks until both platform compilations finish
+    needs: [build-windows, build-android]
     steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Calculate Semantic Version for Release Tagging
+      uses: dotnet/nbgv@master
+      id: nbgv
+
     - name: Download Windows Binary
       uses: actions/download-artifact@v4
       with:
@@ -132,17 +147,18 @@ jobs:
         name: android-binary
         path: ./release-assets
 
+    # Automatically tags the release using the calculated clean semantic string (e.g. v1.0.14)
     - name: Generate Automated GitHub Release
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: v1.0.${{ github.run_number }}
-        name: Build Release v1.0.${{ github.run_number }}
+        tag_name: v${{ steps.nbgv.outputs.SimpleVersion }}
+        name: Build Release v${{ steps.nbgv.outputs.SimpleVersion }}
         body: |
-          ### Cross-Platform Compiled Build Distribution
-          This release contains the latest matching binary components for your application.
+          ### Automated Semantic Versioning Distribution
+          This release contains compilation packages corresponding to commit height versioning tracking.
           
-          * **Windows Platform (MSIX Desktop Installer):** `ToDo-Windows.msix`
-          * **Android Platform (Sideloadable APK Installer):** `ToDo-Android.apk`
+          * **Windows Installer:** `ToDo-Windows.msix`
+          * **Android Installer:** `ToDo-Android.apk`
         draft: false
         prerelease: false
         files: |
