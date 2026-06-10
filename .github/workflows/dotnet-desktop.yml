@@ -1,0 +1,63 @@
+name: .NET 10 MAUI Windows CI
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        configuration: [Release]
+
+    runs-on: windows-latest
+
+    env:
+      Solution_Name: ToDo.slnx
+      Project_Path: ToDo.Maui.Windows/ToDo.Maui.Windows.csproj
+      Wap_Project_Directory: ToDo.Maui.Windows
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Install .NET 10
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 10.0.x
+
+    - name: Install MAUI Workload
+      run: dotnet workload install maui
+
+    # Decode your permanent PFX from secrets onto the runner
+    - name: Decode the PFX
+      run: |
+        $pfx_cert_byte = [System.Convert]::FromBase64String("${{ secrets.Base64_Encoded_Pfx }}")
+        $certificatePath = Join-Path -Path $env:Wap_Project_Directory -ChildPath PermanentSigningCert.pfx
+        [IO.File]::WriteAllBytes("$certificatePath", $pfx_cert_byte)
+
+    # Publish and Sign using your decoded PFX file
+    - name: Publish MAUI Windows App
+      run: |
+        dotnet publish ${{ env.Project_Path }} `
+          -c ${{ matrix.configuration }} `
+          -f net10.0-windows10.0.19041.0 `
+          -r win-x64 `
+          -p:GenerateAppxPackageOnBuild=true `
+          -p:AppxPackageSigningEnabled=true `
+          -p:PackageCertificateKeyFile=PermanentSigningCert.pfx `
+          -p:PackageCertificatePassword="${{ secrets.Pfx_Key }}"
+
+    # Clean up the PFX file immediately after build
+    - name: Remove the PFX
+      run: Remove-Item -path $env:Wap_Project_Directory\PermanentSigningCert.pfx -Force
+
+    - name: Upload Packaged Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ToDo-Windows-App
+        path: **/AppPackages/**/*
