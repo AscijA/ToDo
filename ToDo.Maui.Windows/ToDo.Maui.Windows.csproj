@@ -3,13 +3,6 @@
 	<PropertyGroup>
 		<PublishReadyToRun>false</PublishReadyToRun>
 		<TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
-
-		<!-- Note for MacCatalyst:
-            The default runtime is maccatalyst-x64, except in Release config, in which case the default is maccatalyst-x64;maccatalyst-arm64.
-            When specifying both architectures, use the plural <RuntimeIdentifiers> instead of the singular <RuntimeIdentifier>.
-            The Mac App Store will NOT accept apps with ONLY maccatalyst-arm64 indicated;
-            either BOTH runtimes must be indicated or ONLY macatalyst-x64. -->
-		<!-- For example: <RuntimeIdentifiers>maccatalyst-x64;maccatalyst-arm64</RuntimeIdentifiers> -->
 		<WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
 		<OutputType>Exe</OutputType>
 		<RootNamespace>ToDo.Maui.Windows</RootNamespace>
@@ -18,86 +11,87 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<EnableDefaultCssItems>false</EnableDefaultCssItems>
 		<Nullable>enable</Nullable>
-	
 		<!-- Display name -->
 		<ApplicationTitle>To Do</ApplicationTitle>
-
 		<!-- App Identifier -->
 		<ApplicationId>ba.ascija.todo.maui.windows</ApplicationId>
-
-		<!-- Versions -->
-		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
-		<ApplicationVersion>1</ApplicationVersion>
-
 		<!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->
 		<WindowsPackageType>MSIX</WindowsPackageType>
-
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
 		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
 		<UserSecretsId>4b3211d5-6dec-4702-a59a-779855187194</UserSecretsId>
 		<PackageIcon>appicon.png</PackageIcon>
 		<Platforms>AnyCPU;x64</Platforms>
 	</PropertyGroup>
+	<PropertyGroup>
+		<SemanticBuildVersion Condition="'$(SEMVER)' != ''">$(SEMVER)</SemanticBuildVersion>
+		<SemanticBuildVersion Condition="'$(SEMVER)' == ''">1.0.1</SemanticBuildVersion>
 
+		<ApplicationDisplayVersion>$(SemanticBuildVersion)</ApplicationDisplayVersion>
+		<ApplicationVersion Condition="'$(BUILD_NUMBER)' != ''">$(BUILD_NUMBER)</ApplicationVersion>
+		<ApplicationVersion Condition="'$(BUILD_NUMBER)' == ''">1</ApplicationVersion>
+
+		<Version>$(SemanticBuildVersion).0</Version>
+	</PropertyGroup>
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net10.0-maccatalyst|AnyCPU'">
-	  <ApplicationTitle>To Do</ApplicationTitle>
-	  <ApplicationIdGuid>E1A9E163-DB1B-48EC-B589-D000D0C2C867</ApplicationIdGuid>
+		<ApplicationTitle>To Do</ApplicationTitle>
+		<ApplicationIdGuid>E1A9E163-DB1B-48EC-B589-D000D0C2C867</ApplicationIdGuid>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net10.0-maccatalyst|x64'">
-	  <ApplicationTitle>To Do</ApplicationTitle>
-	  <ApplicationIdGuid>E1A9E163-DB1B-48EC-B589-D000D0C2C867</ApplicationIdGuid>
+		<ApplicationTitle>To Do</ApplicationTitle>
+		<ApplicationIdGuid>E1A9E163-DB1B-48EC-B589-D000D0C2C867</ApplicationIdGuid>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net10.0-windows10.0.19041.0|AnyCPU'">
-	  <ApplicationTitle>To Do</ApplicationTitle>
-	  <ApplicationIdGuid>E1A9E163-DB1B-48EC-B589-D000D0C2C867</ApplicationIdGuid>
+		<ApplicationTitle>To Do</ApplicationTitle>
+		<ApplicationIdGuid>E1A9E163-DB1B-48EC-B589-D000D0C2C867</ApplicationIdGuid>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net10.0-windows10.0.19041.0|x64'">
-	  <ApplicationTitle>To Do</ApplicationTitle>
-	  <ApplicationIdGuid>E1A9E163-DB1B-48EC-B589-D000D0C2C867</ApplicationIdGuid>
+		<ApplicationTitle>To Do</ApplicationTitle>
+		<ApplicationIdGuid>E1A9E163-DB1B-48EC-B589-D000D0C2C867</ApplicationIdGuid>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net10.0-maccatalyst|AnyCPU'">
-	  <ApplicationTitle>To Do</ApplicationTitle>
-	  <ApplicationIdGuid>E1A9E163-DB1B-48EC-B589-D000D0C2C867</ApplicationIdGuid>
+		<ApplicationTitle>To Do</ApplicationTitle>
+		<ApplicationIdGuid>E1A9E163-DB1B-48EC-B589-D000D0C2C867</ApplicationIdGuid>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net10.0-maccatalyst|x64'">
-	  <ApplicationTitle>To Do</ApplicationTitle>
-	  <ApplicationIdGuid>E1A9E163-DB1B-48EC-B589-D000D0C2C867</ApplicationIdGuid>
+		<ApplicationTitle>To Do</ApplicationTitle>
+		<ApplicationIdGuid>E1A9E163-DB1B-48EC-B589-D000D0C2C867</ApplicationIdGuid>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net10.0-windows10.0.19041.0|AnyCPU'">
-	  <ApplicationTitle>To Do</ApplicationTitle>
-	  <ApplicationIdGuid>E1A9E163-DB1B-48EC-B589-D000D0C2C867</ApplicationIdGuid>
-	  <Optimize>True</Optimize>
+		<ApplicationTitle>To Do</ApplicationTitle>
+		<ApplicationIdGuid>E1A9E163-DB1B-48EC-B589-D000D0C2C867</ApplicationIdGuid>
+		<Optimize>True</Optimize>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net10.0-windows10.0.19041.0|x64'">
-	  <ApplicationTitle>To Do</ApplicationTitle>
-	  <ApplicationIdGuid>E1A9E163-DB1B-48EC-B589-D000D0C2C867</ApplicationIdGuid>
-	  <Optimize>True</Optimize>
+		<ApplicationTitle>To Do</ApplicationTitle>
+		<ApplicationIdGuid>E1A9E163-DB1B-48EC-B589-D000D0C2C867</ApplicationIdGuid>
+		<Optimize>True</Optimize>
 	</PropertyGroup>
 
 	<PropertyGroup>
-	  <PlatformTarget>x64</PlatformTarget>
-	  <PackageCertificateThumbprint>82A1D9CCB9896BBC0A6A91A7945C7F2172C0F30B</PackageCertificateThumbprint>
-	  <AppxPackageSigningEnabled>True</AppxPackageSigningEnabled>
-	  <GenerateAppInstallerFile>False</GenerateAppInstallerFile>
-	  <AppxPackageSigningTimestampDigestAlgorithm>SHA256</AppxPackageSigningTimestampDigestAlgorithm>
-	  <AppxAutoIncrementPackageRevision>True</AppxAutoIncrementPackageRevision>
-	  <AppxSymbolPackageEnabled>False</AppxSymbolPackageEnabled>
-	  <GenerateTestArtifacts>False</GenerateTestArtifacts>
-	  <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
-	  <SignAssembly>False</SignAssembly>
+		<PlatformTarget>x64</PlatformTarget>
+		<PackageCertificateThumbprint>82A1D9CCB9896BBC0A6A91A7945C7F2172C0F30B</PackageCertificateThumbprint>
+		<AppxPackageSigningEnabled>True</AppxPackageSigningEnabled>
+		<GenerateAppInstallerFile>False</GenerateAppInstallerFile>
+		<AppxPackageSigningTimestampDigestAlgorithm>SHA256</AppxPackageSigningTimestampDigestAlgorithm>
+		<AppxAutoIncrementPackageRevision>True</AppxAutoIncrementPackageRevision>
+		<AppxSymbolPackageEnabled>False</AppxSymbolPackageEnabled>
+		<GenerateTestArtifacts>False</GenerateTestArtifacts>
+		<HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
+		<SignAssembly>False</SignAssembly>
 	</PropertyGroup>
 
 	<ItemGroup>
 		<!-- App Icon -->
 		<MauiIcon Include="Resources\AppIcon\appicon.png" DeepLinking="false">
-		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</MauiIcon>
 		<!-- Splash Screen -->
 		<MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#512BD4" BaseSize="128,128" />
@@ -133,9 +127,9 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <None Update="Resources\AppIcon\appicon.ico">
-	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	  </None>
+		<None Update="Resources\AppIcon\appicon.ico">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
 	</ItemGroup>
 
 

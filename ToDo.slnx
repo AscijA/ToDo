@@ -4,6 +4,7 @@
     <Platform Name="x64" />
   </Configurations>
   <Folder Name="/src/">
+    <File Path="version.json" />
     <Project Path="ToDo.Application/ToDo.Application.csproj" Id="ac9dc440-df45-4b4f-bdae-8cba61bbd38a">
       <Platform Solution="*|x64" Project="x64" />
     </Project>
