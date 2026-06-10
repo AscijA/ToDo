@@ -5,8 +5,17 @@ on:
     branches: [ "master" ]
   pull_request:
     branches: [ "master" ]
+  workflow_call: # Crucial: Allows the release workflow to call this as a function
+    inputs:
+      explicit_version:
+        type: string
+        required: false
+        default: ''
 
 jobs:
+  # ==========================================
+  # WINDOWS BUILD TRACK
+  # ==========================================
   build-windows:
     runs-on: windows-latest
     env:
@@ -23,12 +32,32 @@ jobs:
       with:
         dotnet-version: 10.0.x
 
-    - name: Install MAUI Workload
+    - name: Install MAUI Windows Workload
       run: dotnet workload install maui-windows
 
     - name: Calculate Semantic Version
       uses: dotnet/nbgv@master
       id: nbgv
+
+    # Figures out whether to use the manual release version or the git height fallback version
+    - name: Resolve Versioning Variables
+      shell: powershell
+      id: version_resolver
+      run: |
+        $version = "${{ inputs.explicit_version }}"
+        if ([string]::IsNullOrEmpty($version)) { $version = "${{ steps.nbgv.outputs.SimpleVersion }}" }
+        echo "final_version=$version" >> $env:GITHUB_OUTPUT
+
+    # FIX: Patches the manifest directly inside the single reusable build block
+    - name: Dynamically Patch AppxManifest Version
+      shell: powershell
+      run: |
+        $manifestPath = "${{ env.Wap_Project_Directory }}/Platforms/Windows/Package.appxmanifest"
+        [xml]$xml = Get-Content $manifestPath
+        $targetVersion = "${{ steps.version_resolver.outputs.final_version }}"
+        $xml.Package.Identity.Version = "$targetVersion.0"
+        $xml.Save($manifestPath)
+        Write-Host "Successfully patched Package.appxmanifest internal Identity to: $targetVersion.0"
 
     - name: Decode the PFX
       run: |
@@ -37,7 +66,7 @@ jobs:
         [IO.File]::WriteAllBytes("$certificatePath", $pfx_cert_byte)
 
     - name: Compile MAUI Windows App
-      run: dotnet publish ${{ env.Project_Path }} -c Release -f net10.0-windows10.0.19041.0 -r win-x64 -p:GenerateAppxPackageOnBuild=true -p:AppxPackageSigningEnabled=false -p:SEMVER="${{ steps.nbgv.outputs.SimpleVersion }}" -p:BUILD_NUMBER=${{ steps.nbgv.outputs.GitCommitIdHeight }} -p:AppxPackageVersion="${{ steps.nbgv.outputs.SimpleVersion }}.0"
+      run: dotnet publish ${{ env.Project_Path }} -c Release -f net10.0-windows10.0.19041.0 -r win-x64 -p:GenerateAppxPackageOnBuild=true -p:AppxPackageSigningEnabled=false -p:SEMVER="${{ steps.version_resolver.outputs.final_version }}" -p:BUILD_NUMBER=${{ github.run_number }} -p:AppxPackageVersion="${{ steps.version_resolver.outputs.final_version }}.0"
 
     - name: Sign MSIX Package via SignTool
       shell: powershell
@@ -46,10 +75,20 @@ jobs:
         if (-not $msixFile) { throw "Could not find any compiled .msix file to sign." }
         $signTool = Get-ChildItem -Path "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" | Select-Object -First 1
         & $signTool.FullName sign /f "${{ env.Wap_Project_Directory }}\PermanentSigningCert.pfx" /p "${{ secrets.Pfx_Key }}" /fd SHA256 /v $msixFile.FullName
+        Copy-Item -Path $msixFile.FullName -Destination "./ToDo-Windows-v${{ steps.version_resolver.outputs.final_version }}.msix"
 
     - name: Remove the PFX
       run: Remove-Item -path $env:Wap_Project_Directory\PermanentSigningCert.pfx -Force
 
+    - name: Upload Windows Staging Binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-binary
+        path: ./ToDo-Windows-v${{ steps.version_resolver.outputs.final_version }}.msix
+
+  # ==========================================
+  # ANDROID BUILD TRACK
+  # ==========================================
   build-android:
     runs-on: windows-latest
     env:
@@ -66,12 +105,20 @@ jobs:
       with:
         dotnet-version: 10.0.x
 
-    - name: Install MAUI Workload
+    - name: Install MAUI Android Workload
       run: dotnet workload install maui-android
 
     - name: Calculate Semantic Version
       uses: dotnet/nbgv@master
       id: nbgv
+
+    - name: Resolve Versioning Variables
+      shell: powershell
+      id: version_resolver
+      run: |
+        $version = "${{ inputs.explicit_version }}"
+        if ([string]::IsNullOrEmpty($version)) { $version = "${{ steps.nbgv.outputs.SimpleVersion }}" }
+        echo "final_version=$version" >> $env:GITHUB_OUTPUT
 
     - name: Decode the Keystore
       run: |
@@ -80,7 +127,20 @@ jobs:
         [IO.File]::WriteAllBytes("$keystorePath", $keystore_byte)
 
     - name: Publish MAUI Android App
-      run: dotnet publish ${{ env.Project_Path }} -c Release -f net10.0-android -p:AndroidKeyStore=true -p:AndroidSigningKeyStore=todo.keystore -p:AndroidSigningKeyAlias="todo_alias" -p:AndroidSigningKeyPass="${{ secrets.Pfx_Key }}" -p:AndroidSigningStorePass="${{ secrets.Pfx_Key }}" -p:SEMVER="${{ steps.nbgv.outputs.SimpleVersion }}" -p:BUILD_NUMBER=${{ steps.nbgv.outputs.GitCommitIdHeight }}
+      run: dotnet publish ${{ env.Project_Path }} -c Release -f net10.0-android -p:AndroidKeyStore=true -p:AndroidSigningKeyStore=todo.keystore -p:AndroidSigningKeyAlias="todo_alias" -p:AndroidSigningKeyPass="${{ secrets.Pfx_Key }}" -p:AndroidSigningStorePass="${{ secrets.Pfx_Key }}" -p:SEMVER="${{ steps.version_resolver.outputs.final_version }}" -p:BUILD_NUMBER=${{ github.run_number }}
+
+    - name: Locate and Stage Android APK
+      shell: powershell
+      run: |
+        $apkFile = Get-ChildItem -Path "${{ env.Wap_Project_Directory }}/bin/Release/net10.0-android/publish/*-signed.apk" -Recurse | Select-Object -First 1
+        if (-not $apkFile) { throw "Could not find signed APK." }
+        Copy-Item -Path $apkFile.FullName -Destination "./ToDo-Android-v${{ steps.version_resolver.outputs.final_version }}.apk"
 
     - name: Remove the Keystore
       run: Remove-Item -path ${{ env.Wap_Project_Directory }}\todo.keystore -Force
+
+    - name: Upload Android Staging Binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: android-binary
+        path: ./ToDo-Android-v${{ steps.version_resolver.outputs.final_version }}.apk
