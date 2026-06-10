@@ -10,7 +10,7 @@ jobs:
   build:
     strategy:
       matrix:
-        configuration: [Release] # FIXED: Wrapped in brackets to resolve line 15 syntax error
+        configuration: [Release]
 
     runs-on: windows-latest
 
@@ -34,19 +34,20 @@ jobs:
     - name: Install MAUI Workload
       run: dotnet workload install maui
 
-    # Decode your permanent Keystore from your secret
+    # Decode your permanent Keystore directly into the Android project folder
     - name: Decode the Keystore
       run: |
         $keystore_byte = [System.Convert]::FromBase64String("${{ secrets.Base64_Encoded_Keystore }}")
-        [IO.File]::WriteAllBytes("todo.keystore", $keystore_byte)
+        $keystorePath = Join-Path -Path $env:Wap_Project_Directory -ChildPath todo.keystore
+        [IO.File]::WriteAllBytes("$keystorePath", $keystore_byte)
 
-    # Publish and Sign the Android app with Automatic Versioning
+    # Publish and Sign the Android app (Pointing explicitly to the project-relative keystore)
     - name: Publish MAUI Android App
-      run: dotnet publish ${{ env.Project_Path }} -c ${{ matrix.configuration }} -f net10.0-android -p:AndroidKeyStore=true -p:AndroidSigningKeyStore=todo.keystore -p:AndroidSigningKeyAlias="todo_alias" -p:AndroidSigningKeyPass="${{ secrets.Pfx_Key }}" -p:AndroidSigningStorePass="${{ secrets.Pfx_Key }}" -p:ApplicationDisplayVersion="${{ env.BASE_VERSION }}.${{ github.run_number }}" -p:ApplicationVersion=${{ github.run_number }}
+      run: dotnet publish ${{ env.Project_Path }} -c ${{ matrix.configuration }} -f net10.0-android -p:AndroidKeyStore=true -p:AndroidSigningKeyStore=todo.keystore -p:AndroidSigningKeyAlias="todo_alias" -p:AndroidSigningKeyPass="${{ secrets.Pfx_Key }}" -p:AndroidSigningStorePass="${{ secrets.Pfx_Key }}"
 
-    # Clean up the Keystore file immediately after build
+    # Clean up the Keystore file from the project directory immediately after build
     - name: Remove the Keystore
-      run: Remove-Item -path todo.keystore -Force
+      run: Remove-Item -path ${{ env.Wap_Project_Directory }}\todo.keystore -Force
 
     # Upload both the production AAB and sideloadable APK files
     - name: Upload Packaged Artifacts
