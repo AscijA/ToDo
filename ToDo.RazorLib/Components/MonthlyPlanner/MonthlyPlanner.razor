@@ -13,29 +13,100 @@
 					  OnToday="GoToToday"
 					  OnDateSelected="OnDateSelected" />
 
-@foreach (var item in MonthlyItems) {
-	<MonthlyItem @key="item.OccurrenceId"
-				 Monthly="item"
-				 OnSaved="RefreshListAsync" />
+@if (ShowLayoutToggle) {
+	<div class="monthly-layout-toggle">
+		<MudTooltip Text="@GetLayoutToggleTooltip()">
+			<MudIconButton Icon="@GetLayoutToggleIcon()"
+						   Color="Color.Primary"
+						   Size="Size.Small"
+						   aria-label="@GetLayoutToggleTooltip()"
+						   OnClick="ToggleLayout" />
+		</MudTooltip>
+	</div>
 }
 
-@if (Date.Month >= DateTime.Now.Month) {
-	<MonthlyItem Monthly="newItem"
-				 @key="Guid.NewGuid()"
-				 OnSaved="RefreshListAsync"
-				 AutoFocus="shouldAutoFocus" />
+@if (IsCalendarLayout) {
+	<div class="monthly-calendar">
+		@foreach (var day in CalendarWeekDays) {
+			<div class="monthly-calendar-weekday">@GetShortDayName(day)</div>
+		}
+
+		@foreach (var date in CalendarDates) {
+			<div class="@GetCalendarDayClass(date)">
+				@if (date.HasValue) {
+					<div class="monthly-calendar-date">@date.Value.Day</div>
+
+					@foreach (var item in GetItemsForDate(date.Value)) {
+						<div class="monthly-calendar-item" style="@GetCalendarItemStyle(item)">
+							<span class="monthly-calendar-item-title @(item.IsDone ? "monthly-calendar-item-done" : string.Empty)">
+								@item.Title
+							</span>
+						</div>
+					}
+				}
+			</div>
+		}
+	</div>
+
+	@if (UnscheduledItems.Any()) {
+		<section class="monthly-unscheduled">
+			<h2 class="monthly-unscheduled-heading">Unscheduled</h2>
+
+			@foreach (var item in UnscheduledItems) {
+				<div class="monthly-calendar-item" style="@GetCalendarItemStyle(item)">
+					<span class="monthly-calendar-item-title @(item.IsDone ? "monthly-calendar-item-done" : string.Empty)">
+						@item.Title
+					</span>
+				</div>
+			}
+		</section>
+	}
+}
+else {
+	@foreach (var item in MonthlyItems) {
+		<MonthlyItem @key="item.OccurrenceId"
+					 Monthly="item"
+					 OnSaved="RefreshListAsync" />
+	}
+
+	@if (Date.Month >= DateTime.Now.Month) {
+		<MonthlyItem Monthly="newItem"
+					 @key="Guid.NewGuid()"
+					 OnSaved="RefreshListAsync"
+					 AutoFocus="shouldAutoFocus" />
+	}
 }
 
 @code {
 	private const string DatePrefKey = "LastViewedMonthlyDate";
+	private const string LayoutPrefKey = "MonthlyLayout";
+	private static readonly DayOfWeek[] CalendarWeekDays = [
+		DayOfWeek.Monday,
+		DayOfWeek.Tuesday,
+		DayOfWeek.Wednesday,
+		DayOfWeek.Thursday,
+		DayOfWeek.Friday,
+		DayOfWeek.Saturday,
+		DayOfWeek.Sunday
+	];
+
 	private MonthlyItemDTO newItem = new();
 	public List<MonthlyItemDTO> MonthlyItems { get; set; } = new();
 	private DateOnly Date { get; set; }
 	private DateTime selectedDateTime;
 	private bool shouldAutoFocus;
+	private bool isCalendarLayout;
+
+	[Parameter]
+	public bool ShowLayoutToggle { get; set; }
+
+	private bool IsCalendarLayout => ShowLayoutToggle && isCalendarLayout;
+	private IEnumerable<MonthlyItemDTO> UnscheduledItems => MonthlyItems.Where(item => !IsDayInCurrentMonth(item.DayOfMonth));
+	private IReadOnlyList<DateOnly?> CalendarDates => GetCalendarDates();
 
 	protected override async Task OnInitializedAsync() {
 		SyncDataRefresh.RefreshRequested += OnSyncDataRefreshRequested;
+		isCalendarLayout = ShowLayoutToggle && SettingsService.Get(LayoutPrefKey, "1") == "2";
 		var savedDateStr = SettingsService.Get(DatePrefKey, string.Empty);
 		if (!string.IsNullOrEmpty(savedDateStr) && DateOnly.TryParse(savedDateStr, out var parsedDate)) {
 			Date = GetMonthStart(parsedDate);
@@ -94,6 +165,64 @@
 			StateHasChanged();
 		});
 	}
+
+	private void ToggleLayout() {
+		isCalendarLayout = !isCalendarLayout;
+		SettingsService.Set(LayoutPrefKey, isCalendarLayout ? "2" : "1");
+		shouldAutoFocus = false;
+	}
+
+	private IEnumerable<MonthlyItemDTO> GetItemsForDate(DateOnly date) =>
+		MonthlyItems.Where(item => item.DayOfMonth == date.Day);
+
+	private IReadOnlyList<DateOnly?> GetCalendarDates() {
+		var dates = new List<DateOnly?>();
+		var leadingDays = GetMondayBasedDayIndex(Date.DayOfWeek);
+		for (var i = 0; i < leadingDays; i++) {
+			dates.Add(null);
+		}
+
+		var daysInMonth = DateTime.DaysInMonth(Date.Year, Date.Month);
+		for (var day = 1; day <= daysInMonth; day++) {
+			dates.Add(new DateOnly(Date.Year, Date.Month, day));
+		}
+
+		while (dates.Count % 7 != 0) {
+			dates.Add(null);
+		}
+
+		return dates;
+	}
+
+	private string GetCalendarDayClass(DateOnly? date) {
+		var className = date.HasValue
+			? "monthly-calendar-day"
+			: "monthly-calendar-day monthly-calendar-day-empty";
+
+		if (date == DateOnly.FromDateTime(DateTime.Now)) {
+			className += " monthly-calendar-day-today";
+		}
+
+		return className;
+	}
+
+	private string GetCalendarItemStyle(MonthlyItemDTO item) =>
+		string.IsNullOrWhiteSpace(item.Color) ? string.Empty : $"--monthly-item-color: {item.Color};";
+
+	private bool IsDayInCurrentMonth(int? dayOfMonth) =>
+		dayOfMonth is >= 1 && dayOfMonth <= DateTime.DaysInMonth(Date.Year, Date.Month);
+
+	private static int GetMondayBasedDayIndex(DayOfWeek day) =>
+		(7 + ((int)day - (int)DayOfWeek.Monday)) % 7;
+
+	private static string GetShortDayName(DayOfWeek day) =>
+		day.ToString()[..3];
+
+	private string GetLayoutToggleIcon() =>
+		IsCalendarLayout ? Icons.Material.Filled.ViewAgenda : Icons.Material.Filled.CalendarMonth;
+
+	private string GetLayoutToggleTooltip() =>
+		IsCalendarLayout ? "Use monthly list layout" : "Use calendar month layout";
 
 	public void Dispose() {
 		SyncDataRefresh.RefreshRequested -= OnSyncDataRefreshRequested;

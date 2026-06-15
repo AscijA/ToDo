@@ -2,29 +2,39 @@
 @inject IDailyPlanService DailyPlanService
 @inject IWeeklyOccurrenceService WeeklyOccurrenceService
 
-<PlannerItemCard Item="Weekly"
-					  ReadOnly="IsHistory()"
-					  OnDelete="OnDeleteClick"
-					  OnTitleChanged="SaveChanges">
-	<Schedule>
-		<MudSelect T="DayOfWeek?"
-					  @bind-Value="Weekly.WeekDay"
-					  @bind-Value:after="SaveChanges"
-					  Label=""
-					  Margin="Margin.Dense"
-					  Dense="true"
-					  Class="weekly-day-select">
-			<MudSelectItem T="DayOfWeek?" Value="@null">&nbsp</MudSelectItem>
-			<MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Monday">Mon</MudSelectItem>
-			<MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Tuesday">Tue</MudSelectItem>
-			<MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Wednesday">Wed</MudSelectItem>
-			<MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Thursday">Thu</MudSelectItem>
-			<MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Friday">Fri</MudSelectItem>
-			<MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Saturday">Sat</MudSelectItem>
-			<MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Sunday">Sun</MudSelectItem>
-		</MudSelect>
-	</Schedule>
-</PlannerItemCard>
+@if (HideSchedule) {
+	<PlannerItemCard Item="Weekly"
+						  ReadOnly="IsHistory()"
+						  AutoFocus="AutoFocus"
+						  OnDelete="OnDeleteClick"
+						  OnTitleChanged="SaveChanges" />
+}
+else {
+	<PlannerItemCard Item="Weekly"
+						  ReadOnly="IsHistory()"
+						  AutoFocus="AutoFocus"
+						  OnDelete="OnDeleteClick"
+						  OnTitleChanged="SaveChanges">
+		<Schedule>
+			<MudSelect T="DayOfWeek?"
+						  @bind-Value="Weekly.WeekDay"
+						  @bind-Value:after="SaveChanges"
+						  Label=""
+						  Margin="Margin.Dense"
+						  Dense="true"
+						  Class="weekly-day-select">
+				<MudSelectItem T="DayOfWeek?" Value="@null">&nbsp</MudSelectItem>
+				<MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Monday">Mon</MudSelectItem>
+				<MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Tuesday">Tue</MudSelectItem>
+				<MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Wednesday">Wed</MudSelectItem>
+				<MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Thursday">Thu</MudSelectItem>
+				<MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Friday">Fri</MudSelectItem>
+				<MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Saturday">Sat</MudSelectItem>
+				<MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Sunday">Sun</MudSelectItem>
+			</MudSelect>
+		</Schedule>
+	</PlannerItemCard>
+}
 
 @code {
 	[Parameter]
@@ -35,6 +45,9 @@
 
 	[Parameter]
 	public bool AutoFocus { get; set; }
+
+	[Parameter]
+	public bool HideSchedule { get; set; }
 
 	private async Task OnDeleteClick(MouseEventArgs args) {
 		try {

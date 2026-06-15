@@ -1,0 +1,97 @@
+.monthly-layout-toggle {
+	display: flex;
+	justify-content: flex-end;
+	margin: -2px 0 4px;
+}
+
+.monthly-calendar {
+	border-left: 1px solid var(--mud-palette-lines-default);
+	border-top: 1px solid var(--mud-palette-lines-default);
+	display: grid;
+	grid-template-columns: repeat(7, minmax(0, 1fr));
+	width: 100%;
+}
+
+.monthly-calendar-weekday {
+	background-color: var(--mud-palette-surface);
+	border-bottom: 1px solid var(--mud-palette-lines-default);
+	border-right: 1px solid var(--mud-palette-lines-default);
+	color: var(--mud-palette-text-secondary);
+	font-size: 0.68rem;
+	font-weight: 700;
+	line-height: 1;
+	padding: 6px 2px;
+	text-align: center;
+}
+
+.monthly-calendar-day {
+	border-bottom: 1px solid var(--mud-palette-lines-default);
+	border-right: 1px solid var(--mud-palette-lines-default);
+	box-sizing: border-box;
+	min-height: 72px;
+	min-width: 0;
+	padding: 0 3px 3px 0;
+}
+
+.monthly-calendar-day-empty {
+	background-color: rgba(127, 127, 127, .04);
+}
+
+.monthly-calendar-day-today {
+	box-shadow: inset 0 0 0 1px var(--mud-palette-primary);
+}
+
+.monthly-calendar-date {
+	border-bottom: 1px solid var(--mud-palette-lines-default);
+	border-right: 1px solid var(--mud-palette-lines-default);
+	color: var(--mud-palette-text-primary);
+	align-items: center;
+	display: flex;
+	font-size: 0.72rem;
+	font-weight: 700;
+	height: 18px;
+	justify-content: center;
+	line-height: 1;
+	margin: 0 0 4px;
+	padding: 0;
+	text-align: center;
+	width: 20px;
+}
+
+.monthly-calendar-item {
+	align-items: center;
+	border-left: 2px solid var(--monthly-item-color, var(--mud-palette-primary));
+	display: flex;
+	min-width: 0;
+	padding-left: 3px;
+}
+
+.monthly-calendar-item-title {
+	color: var(--mud-palette-text-primary);
+	display: block;
+	font-size: 0.66rem;
+	line-height: 1.15;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.monthly-calendar-item-done {
+	opacity: .6;
+	text-decoration: line-through;
+}
+
+.monthly-unscheduled {
+	border-top: 1px solid var(--mud-palette-lines-default);
+	margin-top: 8px;
+	padding-top: 8px;
+}
+
+.monthly-unscheduled-heading {
+	color: var(--mud-palette-text-primary);
+	font-size: 0.92rem;
+	font-weight: 700;
+	line-height: 1.2;
+	margin: 0 0 4px;
+}

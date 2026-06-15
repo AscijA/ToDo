@@ -12,29 +12,101 @@
 					  OnToday="GoToToday"
 					  OnDateSelected="OnDateSelected" />
 
-@foreach (var item in WeeklyItems) {
-	<WeeklyItem @key="item.OccurrenceId"
-				Weekly="item"
-				OnSaved="RefreshListAsync" />
+@if (ShowLayoutToggle) {
+	<div class="weekly-layout-toggle">
+		<MudTooltip Text="@GetLayoutToggleTooltip()">
+			<MudIconButton Icon="@GetLayoutToggleIcon()"
+						   Color="Color.Primary"
+						   Size="Size.Small"
+						   aria-label="@GetLayoutToggleTooltip()"
+						   OnClick="ToggleLayout" />
+		</MudTooltip>
+	</div>
 }
 
-@if (Date >= GetWeekStart(DateOnly.FromDateTime(DateTime.Now))) {
-	<WeeklyItem Weekly="newItem"
-				@key="Guid.NewGuid()"
-				OnSaved="RefreshListAsync"
-				AutoFocus="shouldAutoFocus" />
+@if (IsGroupedLayout) {
+	<div class="weekly-grouped-layout">
+		@foreach (var day in WeekDays) {
+			<section class="weekly-day-section">
+				<h2 class="weekly-day-heading">@day</h2>
+
+				@foreach (var item in GetItemsForDay(day)) {
+					<WeeklyItem @key="item.OccurrenceId"
+								Weekly="item"
+								OnSaved="RefreshListAsync"
+								HideSchedule="true" />
+				}
+
+				@if (CanAddItems) {
+					<WeeklyItem Weekly="newItemsByDay[day]"
+								@key="newItemsByDay[day]"
+								OnSaved="@(() => RefreshListAsync(day))"
+								AutoFocus="ShouldAutoFocusDay(day)"
+								HideSchedule="true" />
+				}
+			</section>
+		}
+
+		@if (UnscheduledItems.Any()) {
+			<section class="weekly-day-section">
+				<h2 class="weekly-day-heading">Unscheduled</h2>
+
+				@foreach (var item in UnscheduledItems) {
+					<WeeklyItem @key="item.OccurrenceId"
+								Weekly="item"
+								OnSaved="RefreshListAsync" />
+				}
+			</section>
+		}
+	</div>
+}
+else {
+	@foreach (var item in WeeklyItems) {
+		<WeeklyItem @key="item.OccurrenceId"
+					Weekly="item"
+					OnSaved="RefreshListAsync" />
+	}
+
+	@if (CanAddItems) {
+		<WeeklyItem Weekly="newItem"
+					@key="Guid.NewGuid()"
+					OnSaved="RefreshListAsync"
+					AutoFocus="shouldAutoFocus" />
+	}
 }
 
 @code {
 	private const string DatePrefKey = "LastViewedWeeklyDate";
+	private const string LayoutPrefKey = "WeeklyLayout";
+	private static readonly DayOfWeek[] WeekDays = [
+		DayOfWeek.Monday,
+		DayOfWeek.Tuesday,
+		DayOfWeek.Wednesday,
+		DayOfWeek.Thursday,
+		DayOfWeek.Friday,
+		DayOfWeek.Saturday,
+		DayOfWeek.Sunday
+	];
+
 	private WeeklyItemDTO newItem = new();
+	private Dictionary<DayOfWeek, WeeklyItemDTO> newItemsByDay = new();
 	public List<WeeklyItemDTO> WeeklyItems { get; set; } = new();
 	private DateOnly Date { get; set; }
 	private DateTime selectedDateTime;
 	private bool shouldAutoFocus;
+	private DayOfWeek? autoFocusDay;
+	private bool isGroupedLayout;
+
+	[Parameter]
+	public bool ShowLayoutToggle { get; set; }
+
+	private bool IsGroupedLayout => ShowLayoutToggle && isGroupedLayout;
+	private bool CanAddItems => Date >= GetWeekStart(DateOnly.FromDateTime(DateTime.Now));
+	private IEnumerable<WeeklyItemDTO> UnscheduledItems => WeeklyItems.Where(item => !item.WeekDay.HasValue);
 
 	protected override async Task OnInitializedAsync() {
 		SyncDataRefresh.RefreshRequested += OnSyncDataRefreshRequested;
+		isGroupedLayout = ShowLayoutToggle && SettingsService.Get(LayoutPrefKey, "1") == "2";
 		var savedDateStr = SettingsService.Get(DatePrefKey, string.Empty);
 		if (!string.IsNullOrEmpty(savedDateStr) && DateOnly.TryParse(savedDateStr, out var parsedDate)) {
 			Date = GetWeekStart(parsedDate);
@@ -50,10 +122,18 @@
 	private async Task LoadTasksAsync() {
 		WeeklyItems = await TaskService.GetAllWeeklyAsync(Date);
 		newItem = new WeeklyItemDTO { Date = Date };
+		newItemsByDay = WeekDays.ToDictionary(day => day, day => new WeeklyItemDTO { Date = Date, WeekDay = day });
 	}
 
 	private async Task RefreshListAsync() {
 		shouldAutoFocus = true;
+		autoFocusDay = null;
+		await LoadTasksAsync();
+	}
+
+	private async Task RefreshListAsync(DayOfWeek day) {
+		shouldAutoFocus = true;
+		autoFocusDay = day;
 		await LoadTasksAsync();
 	}
 
@@ -89,10 +169,30 @@
 	private void OnSyncDataRefreshRequested() {
 		_ = InvokeAsync(async () => {
 			shouldAutoFocus = false;
+			autoFocusDay = null;
 			await LoadTasksAsync();
 			StateHasChanged();
 		});
 	}
+
+	private void ToggleLayout() {
+		isGroupedLayout = !isGroupedLayout;
+		SettingsService.Set(LayoutPrefKey, isGroupedLayout ? "2" : "1");
+		shouldAutoFocus = false;
+		autoFocusDay = null;
+	}
+
+	private IEnumerable<WeeklyItemDTO> GetItemsForDay(DayOfWeek day) =>
+		WeeklyItems.Where(item => item.WeekDay == day);
+
+	private bool ShouldAutoFocusDay(DayOfWeek day) =>
+		shouldAutoFocus && autoFocusDay == day;
+
+	private string GetLayoutToggleIcon() =>
+		IsGroupedLayout ? Icons.Material.Filled.ViewAgenda : Icons.Material.Filled.FormatListBulleted;
+
+	private string GetLayoutToggleTooltip() =>
+		IsGroupedLayout ? "Use compact weekly layout" : "Group tasks by weekday";
 
 	public void Dispose() {
 		SyncDataRefresh.RefreshRequested -= OnSyncDataRefreshRequested;
