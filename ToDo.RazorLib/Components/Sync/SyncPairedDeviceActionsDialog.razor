@@ -1,6 +1,7 @@
 @using ToDo.RazorLib.Services
 @inject ISyncService SyncService
 @inject IDialogService DialogService
+@inject SyncActivityLogService ActivityLog
 
 <MudDialog Class="sync-device-actions-dialog">
 	<DialogContent>
@@ -140,11 +141,13 @@
 				? Severity.Success
 				: Severity.Warning;
 			_message = FormatSyncNowMessage(push, import);
+			ActivityLog.AddSuccess(Device.DeviceName, _message);
 			await OnDevicesChanged.InvokeAsync();
 		}
 		catch (Exception ex) {
 			_messageSeverity = Severity.Warning;
 			_message = SyncUserMessages.Explain(ex);
+			ActivityLog.AddError(Device.DeviceName, _message);
 			await OnDevicesChanged.InvokeAsync();
 		}
 		finally {

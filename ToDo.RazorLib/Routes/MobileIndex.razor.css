@@ -19,3 +19,10 @@
     overflow: hidden;
 }
 
+::deep .mobile-quick-add-fab {
+    position: fixed;
+    right: 18px;
+    bottom: 78px;
+    z-index: 20;
+}
+

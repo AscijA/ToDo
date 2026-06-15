@@ -11,6 +11,5 @@ public class DailyItemDTO : PlannerItemDTO {
         Timeslot = timeslot;
     }
 
-    [Required(ErrorMessage = "Required")]
     public string? Timeslot { get; set; }
 }

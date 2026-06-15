@@ -57,7 +57,7 @@ public class TaskListService : ITaskListService {
         var l = new TaskList { Name = name, Color = color, Description = description, Position = maxPosition + 1 };
         ctx.TaskLists.Add(l);
         await ctx.SaveChangesAsync();
-        _dataChangeNotifier.NotifyChanged();
+        _dataChangeNotifier.NotifyChanged(l.Id);
         return new TaskListDto(l.Id, l.Name, l.Color, l.Description, l.Position, new List<TaskListItemDto>());
     }
 
@@ -69,7 +69,7 @@ public class TaskListService : ITaskListService {
         l.Color = color;
         l.Description = description;
         await ctx.SaveChangesAsync();
-        _dataChangeNotifier.NotifyChanged();
+        _dataChangeNotifier.NotifyChanged(l.Id);
     }
 
     public async Task DeleteAsync(Guid id) {
@@ -78,7 +78,35 @@ public class TaskListService : ITaskListService {
         if (l == null) return;
         ctx.TaskLists.Remove(l);
         await ctx.SaveChangesAsync();
+        _dataChangeNotifier.NotifyDeleted(id);
+    }
+
+    public async Task<Guid> CreateTaskAsync(string title, string? description, IReadOnlyCollection<Guid> taskListIds) {
+        using var ctx = await _contextFactory.CreateDbContextAsync();
+
+        var taskDef = new TaskDefinition {
+            Title = title,
+            Description = description ?? string.Empty
+        };
+        ctx.TaskDefinitions.Add(taskDef);
+
+        foreach (var listId in taskListIds.Distinct()) {
+            var maxPosition = await ctx.TaskListItems
+                .Where(i => i.TaskListId == listId)
+                .Select(i => (int?)i.Position)
+                .MaxAsync() ?? -1;
+
+            ctx.TaskListItems.Add(new TaskListItem {
+                TaskDefinition = taskDef,
+                TaskListId = listId,
+                Position = maxPosition + 1
+            });
+        }
+
+        await ctx.SaveChangesAsync();
         _dataChangeNotifier.NotifyChanged();
+
+        return taskDef.Id;
     }
 
     public async Task<TaskListItemDto> AddItemAsync(Guid listId, string text) {
@@ -95,7 +123,7 @@ public class TaskListService : ITaskListService {
         var li = new TaskListItem { TaskDefinition = taskDef, TaskListId = listId, Position = maxPosition + 1 };
         ctx.TaskListItems.Add(li);
         await ctx.SaveChangesAsync();
-        _dataChangeNotifier.NotifyChanged();
+        _dataChangeNotifier.NotifyChanged(taskDef.Id, li.Id);
         return new TaskListItemDto(li.Id, taskDef.Id, taskDef.Title, li.IsDone, li.Position);
     }
 
@@ -121,7 +149,8 @@ public class TaskListService : ITaskListService {
         foreach (var o in monthly) o.IsDone = isDone;
 
         await ctx.SaveChangesAsync();
-        _dataChangeNotifier.NotifyChanged();
+        _dataChangeNotifier.NotifyChanged(
+            [li.Id, li.TaskDefinitionId, .. daily.Select(o => o.Id), .. weekly.Select(o => o.Id), .. monthly.Select(o => o.Id)]);
     }
 
     public async Task DeleteItemAsync(Guid itemId) {
@@ -130,7 +159,7 @@ public class TaskListService : ITaskListService {
         if (it == null) return;
         ctx.TaskListItems.Remove(it);
         await ctx.SaveChangesAsync();
-        _dataChangeNotifier.NotifyChanged();
+        _dataChangeNotifier.NotifyDeleted(itemId);
     }
 
     public async Task UpdateOrderAsync(Guid listId, List<Guid> itemIds) {
@@ -145,7 +174,7 @@ public class TaskListService : ITaskListService {
         }
 
         await ctx.SaveChangesAsync();
-        _dataChangeNotifier.NotifyChanged();
+        _dataChangeNotifier.NotifyChanged(items.Select(item => item.Id).ToArray());
     }
 
     public async Task ReorderListsAsync(List<Guid> listIds) {
@@ -160,6 +189,6 @@ public class TaskListService : ITaskListService {
         }
 
         await ctx.SaveChangesAsync();
-        _dataChangeNotifier.NotifyChanged();
+        _dataChangeNotifier.NotifyChanged(lists.Select(list => list.Id).ToArray());
     }
 }

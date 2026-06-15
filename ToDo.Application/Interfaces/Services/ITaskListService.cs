@@ -8,6 +8,7 @@ public interface ITaskListService {
     Task<TaskListDto> CreateAsync(string name, string color, string? description);
     Task UpdateAsync(Guid id, string name, string color, string? description);
     Task DeleteAsync(Guid id);
+    Task<Guid> CreateTaskAsync(string title, string? description, IReadOnlyCollection<Guid> taskListIds);
     Task<TaskListItemDto> AddItemAsync(Guid listId, string text);
     Task UpdateItemAsync(TaskListItemDto item);
     Task DeleteItemAsync(Guid itemId);

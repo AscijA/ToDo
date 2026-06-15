@@ -13,7 +13,7 @@
 					  OnDateSelected="OnDateSelected" />
 
 @foreach (var item in WeeklyItems) {
-	<WeeklyItem @key="item.TaskDefinitionId"
+	<WeeklyItem @key="item.OccurrenceId"
 				Weekly="item"
 				OnSaved="RefreshListAsync" />
 }

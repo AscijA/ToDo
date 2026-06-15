@@ -14,7 +14,7 @@
 					  OnDateSelected="OnDateSelected" />
 
 @foreach (var item in MonthlyItems) {
-	<MonthlyItem @key="item.TaskDefinitionId"
+	<MonthlyItem @key="item.OccurrenceId"
 				 Monthly="item"
 				 OnSaved="RefreshListAsync" />
 }

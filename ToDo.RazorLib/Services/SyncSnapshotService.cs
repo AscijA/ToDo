@@ -100,6 +100,9 @@ public sealed class SyncSnapshotService : ISyncSnapshotService {
             taskListItems,
             dailyOccurrences,
             weeklyOccurrences,
-            monthlyOccurrences);
+            monthlyOccurrences,
+            changeTracker.GetDeletedEntities()
+                .Select(deleted => new SyncDeletedEntitySnapshot(deleted.Key, deleted.Value))
+                .ToList());
     }
 }

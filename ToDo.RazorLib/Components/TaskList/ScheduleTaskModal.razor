@@ -11,6 +11,7 @@
 
 			<div class="d-flex align-center gap-4 mb-2">
 				<MudCheckBox @bind-Value="_dailyEnabled" Color="Color.Primary" Label="Daily" />
+				<MudDatePicker @bind-Date="_dailyDate" Label="Date" Disabled="!_dailyEnabled" />
 				<MudTextField @bind-Value="_timeslot" Label="Timeslot" Disabled="!_dailyEnabled" Placeholder="09:00" Mask="@(new PatternMask("00:00"))" />
 			</div>
 
@@ -48,7 +49,8 @@
 	[Parameter] public Guid TaskDefinitionId { get; set; }
 	[Parameter] public bool IsDone { get; set; }
 
-	private bool _dailyEnabled;
+	private bool _dailyEnabled = true;
+	private DateTime? _dailyDate = DateTime.Today;
 	private string? _timeslot;
 
 	private bool _weeklyEnabled;
@@ -74,7 +76,8 @@
 		var today = DateOnly.FromDateTime(DateTime.Now);
 
 		if (_dailyEnabled) {
-			await DailyPlanService.AddTaskToDateAsync(today, new DailyItemDTO {
+			var dailyDate = DateOnly.FromDateTime(_dailyDate ?? DateTime.Today);
+			await DailyPlanService.AddTaskToDateAsync(dailyDate, new DailyItemDTO {
 				TaskDefinitionId = TaskDefinitionId,
 				Title = Title,
 				Description = Description,

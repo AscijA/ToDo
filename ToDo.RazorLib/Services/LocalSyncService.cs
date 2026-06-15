@@ -168,21 +168,24 @@ public sealed class LocalSyncService : ISyncService {
 
         if (!response.IsSuccessStatusCode) {
             var error = await response.Content.ReadAsStringAsync(cancellationToken);
-            var offlineDevice = device with { IsOnline = false };
+            var offlineDevice = CreateFailedSyncDevice(device, $"Ping failed: {(int)response.StatusCode} {response.ReasonPhrase}");
             AddOrReplacePairedDevice(offlineDevice);
             throw new InvalidOperationException($"Ping failed: {(int)response.StatusCode} {response.ReasonPhrase}. {error}");
         }
 
         var ping = await response.Content.ReadFromJsonAsync<SyncPingResponse>(cancellationToken);
         if (ping == null || !string.Equals(ping.DeviceId, device.DeviceId, StringComparison.OrdinalIgnoreCase)) {
-            var offlineDevice = device with { IsOnline = false };
+            var offlineDevice = CreateFailedSyncDevice(device, "Ping returned an invalid device identity.");
             AddOrReplacePairedDevice(offlineDevice);
             throw new InvalidOperationException("Ping returned an invalid device identity.");
         }
 
         var onlineDevice = device with {
             DeviceName = ping.DeviceName,
-            IsOnline = true
+            IsOnline = true,
+            FailedSyncAttempts = 0,
+            NextRetryAt = null,
+            LastSyncError = null
         };
         AddOrReplacePairedDevice(onlineDevice);
         return onlineDevice;
@@ -201,11 +204,13 @@ public sealed class LocalSyncService : ISyncService {
 
         if (!response.IsSuccessStatusCode) {
             var error = await response.Content.ReadAsStringAsync(cancellationToken);
+            AddOrReplacePairedDevice(CreateFailedSyncDevice(device, $"Snapshot fetch failed: {(int)response.StatusCode} {response.ReasonPhrase}"));
             throw new InvalidOperationException($"Snapshot fetch failed: {(int)response.StatusCode} {response.ReasonPhrase}. {error}");
         }
 
         var snapshot = await response.Content.ReadFromJsonAsync<SyncSnapshotResponse>(cancellationToken);
         if (snapshot == null || !string.Equals(snapshot.DeviceId, device.DeviceId, StringComparison.OrdinalIgnoreCase)) {
+            AddOrReplacePairedDevice(CreateFailedSyncDevice(device, "Snapshot returned an invalid device identity."));
             throw new InvalidOperationException("Snapshot returned an invalid device identity.");
         }
 
@@ -226,7 +231,7 @@ public sealed class LocalSyncService : ISyncService {
         CancellationToken cancellationToken = default) {
         var remoteSnapshot = await FetchSnapshotAsync(device, cancellationToken);
         var import = await snapshotImportService.ImportNewAsync(remoteSnapshot, cancellationToken);
-        AddOrReplacePairedDevice(device with { LastSyncedAt = DateTimeOffset.Now, IsOnline = true });
+        AddOrReplacePairedDevice(CreateSuccessfulSyncDevice(device));
         return import;
     }
 
@@ -244,15 +249,17 @@ public sealed class LocalSyncService : ISyncService {
 
         if (!response.IsSuccessStatusCode) {
             var error = await response.Content.ReadAsStringAsync(cancellationToken);
+            AddOrReplacePairedDevice(CreateFailedSyncDevice(device, $"Push failed: {(int)response.StatusCode} {response.ReasonPhrase}"));
             throw new InvalidOperationException($"Push failed: {(int)response.StatusCode} {response.ReasonPhrase}. {error}");
         }
 
         var import = await response.Content.ReadFromJsonAsync<SyncImportSummary>(cancellationToken);
         if (import == null) {
+            AddOrReplacePairedDevice(CreateFailedSyncDevice(device, "Push returned an invalid response."));
             throw new InvalidOperationException("Push returned an invalid response.");
         }
 
-        AddOrReplacePairedDevice(device with { LastSyncedAt = DateTimeOffset.Now, IsOnline = true });
+        AddOrReplacePairedDevice(CreateSuccessfulSyncDevice(device));
         return import;
     }
 
@@ -293,6 +300,27 @@ public sealed class LocalSyncService : ISyncService {
             .ToList();
         devices.Add(device);
         SavePairedDevices(devices);
+    }
+
+    private static PairedSyncDevice CreateSuccessfulSyncDevice(PairedSyncDevice device) {
+        return device with {
+            LastSyncedAt = DateTimeOffset.Now,
+            IsOnline = true,
+            FailedSyncAttempts = 0,
+            NextRetryAt = null,
+            LastSyncError = null
+        };
+    }
+
+    private static PairedSyncDevice CreateFailedSyncDevice(PairedSyncDevice device, string error) {
+        var attempts = Math.Min(device.FailedSyncAttempts + 1, 6);
+        var delay = TimeSpan.FromMinutes(Math.Min(Math.Pow(2, attempts - 1), 30));
+        return device with {
+            IsOnline = false,
+            FailedSyncAttempts = attempts,
+            NextRetryAt = DateTimeOffset.Now.Add(delay),
+            LastSyncError = error
+        };
     }
 
     private static string GenerateTrustToken() {

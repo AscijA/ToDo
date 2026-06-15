@@ -12,7 +12,7 @@
 					  OnToday="GoToToday"
 					  OnDateSelected="OnDateSelected" />
 @foreach (var item in DailyItems) {
-	<DailyItem @key="item.TaskDefinitionId"
+	<DailyItem @key="item.OccurrenceId"
 				  Daily="item"
 				  date="Date"
 				  OnSaved="RefreshListAsync" />

@@ -1,6 +1,7 @@
 @using ToDo.RazorLib.Services
 @inject ISyncService SyncService
 @inject ISyncTransportService SyncTransportService
+@inject SyncActivityLogService ActivityLog
 @implements IDisposable
 
 
@@ -62,6 +63,11 @@
 <SyncPairedDevicesPanel Devices="_pairedDevices"
                         OnDevicesChanged="RefreshPairedDevicesAsync" />
 
+<MudDivider />
+
+<SyncActivityPanel Entries="_activityEntries"
+                   OnClear="ClearActivityLog" />
+
 @code {
    [Parameter]
    public bool ShowBackButton { get; set; }
@@ -76,6 +82,7 @@
    private string _manualAddress = string.Empty;
    private IReadOnlyList<AvailableSyncDevice> _availableDevices = Array.Empty<AvailableSyncDevice>();
    private IReadOnlyList<PairedSyncDevice> _pairedDevices = Array.Empty<PairedSyncDevice>();
+   private IReadOnlyList<SyncActivityLogEntry> _activityEntries = Array.Empty<SyncActivityLogEntry>();
    private IReadOnlyList<IncomingPairingRequest> _incomingPairingRequests = Array.Empty<IncomingPairingRequest>();
    private SyncPairingSession? _pairingSession;
    private SyncTransportStatus _transportStatus = new(false, null, null, null, null);
@@ -97,7 +104,9 @@
       _deviceName = identity.DeviceName;
       _manualAddress = identity.ManualAddress;
       _pairedDevices = SyncService.GetPairedDevices();
+      _activityEntries = ActivityLog.GetEntries();
       _pairedDeviceSignature = GetPairedDeviceSignature(_pairedDevices);
+      ActivityLog.Changed += OnActivityLogChanged;
       await ApplyTransportStateAsync();
       RefreshIncomingPairingRequests();
       StartIncomingPairingRefresh();
@@ -312,6 +321,17 @@
       StateHasChanged();
    }
 
+   private void OnActivityLogChanged() {
+      _ = InvokeAsync(() => {
+         _activityEntries = ActivityLog.GetEntries();
+         StateHasChanged();
+      });
+   }
+
+   private void ClearActivityLog() {
+      ActivityLog.Clear();
+   }
+
    private static string GetPairedDeviceSignature(IReadOnlyList<PairedSyncDevice> devices) {
       return string.Join('|', devices
          .OrderBy(device => device.DeviceId, StringComparer.OrdinalIgnoreCase)
@@ -319,6 +339,7 @@
    }
 
    public void Dispose() {
+      ActivityLog.Changed -= OnActivityLogChanged;
       _incomingPairingTimerCancellation?.Cancel();
       _incomingPairingTimerCancellation?.Dispose();
       _incomingPairingTimer?.Dispose();

@@ -23,16 +23,16 @@
 @if (_themeName == "Custom") {
    <MudGrid>
       <MudItem xs="6">
-         <MudColorPicker @bind-Text="_customPrimary" @bind-Text:after="SaveSettingsAsync" Label="Primary" Style="@($"color: {_customPrimary};")" />
+         <MudColorPicker Value="_customPrimaryColor" ValueChanged="OnCustomPrimaryChanged" Text="_customPrimary" Label="Primary" Style="@($"color: {_customPrimary};")" />
       </MudItem>
       <MudItem xs="6">
-         <MudColorPicker @bind-Text="_customSecondary" @bind-Text:after="SaveSettingsAsync" Label="Secondary" Style="@($"color: {_customSecondary};")" />
+         <MudColorPicker Value="_customSecondaryColor" ValueChanged="OnCustomSecondaryChanged" Text="_customSecondary" Label="Secondary" Style="@($"color: {_customSecondary};")" />
       </MudItem>
       <MudItem xs="6">
-         <MudColorPicker @bind-Text="_customBackground" @bind-Text:after="SaveSettingsAsync" Label="Background" Style="@($"color: {_customBackground};")" />
+         <MudColorPicker Value="_customBackgroundColor" ValueChanged="OnCustomBackgroundChanged" Text="_customBackground" Label="Background" Style="@($"color: {_customBackground};")" />
       </MudItem>
       <MudItem xs="6">
-         <MudColorPicker @bind-Text="_customSurface" @bind-Text:after="SaveSettingsAsync" Label="Surface" Style="@($"color: {_customSurface};")" />
+         <MudColorPicker Value="_customSurfaceColor" ValueChanged="OnCustomSurfaceChanged" Text="_customSurface" Label="Surface" Style="@($"color: {_customSurface};")" />
       </MudItem>
    </MudGrid>
 }
@@ -87,6 +87,10 @@
    private string _customSecondary = "#61AFEF";
    private string _customBackground = "#282C34";
    private string _customSurface = "#21252B";
+   private MudBlazor.Utilities.MudColor _customPrimaryColor = new("#C678DD");
+   private MudBlazor.Utilities.MudColor _customSecondaryColor = new("#61AFEF");
+   private MudBlazor.Utilities.MudColor _customBackgroundColor = new("#282C34");
+   private MudBlazor.Utilities.MudColor _customSurfaceColor = new("#21252B");
 
    protected override void OnInitialized() {
       _appearance = SettingsService.Get("Appearance", "System");
@@ -101,6 +105,47 @@
       _customSecondary = SettingsService.Get("Custom_Secondary", "#61AFEF");
       _customBackground = SettingsService.Get("Custom_Background", "#282C34");
       _customSurface = SettingsService.Get("Custom_Surface", "#21252B");
+      LoadCustomColorValues();
+   }
+
+   private void LoadCustomColorValues() {
+      _customPrimaryColor = CreateColor(_customPrimary, "#C678DD");
+      _customSecondaryColor = CreateColor(_customSecondary, "#61AFEF");
+      _customBackgroundColor = CreateColor(_customBackground, "#282C34");
+      _customSurfaceColor = CreateColor(_customSurface, "#21252B");
+   }
+
+   private static MudBlazor.Utilities.MudColor CreateColor(string value, string fallback) {
+      try {
+         return new MudBlazor.Utilities.MudColor(value);
+      }
+      catch {
+         return new MudBlazor.Utilities.MudColor(fallback);
+      }
+   }
+
+   private async Task OnCustomPrimaryChanged(MudBlazor.Utilities.MudColor color) {
+      _customPrimaryColor = color;
+      _customPrimary = color.ToString(MudBlazor.Utilities.MudColorOutputFormats.Hex);
+      await SaveSettingsAsync();
+   }
+
+   private async Task OnCustomSecondaryChanged(MudBlazor.Utilities.MudColor color) {
+      _customSecondaryColor = color;
+      _customSecondary = color.ToString(MudBlazor.Utilities.MudColorOutputFormats.Hex);
+      await SaveSettingsAsync();
+   }
+
+   private async Task OnCustomBackgroundChanged(MudBlazor.Utilities.MudColor color) {
+      _customBackgroundColor = color;
+      _customBackground = color.ToString(MudBlazor.Utilities.MudColorOutputFormats.Hex);
+      await SaveSettingsAsync();
+   }
+
+   private async Task OnCustomSurfaceChanged(MudBlazor.Utilities.MudColor color) {
+      _customSurfaceColor = color;
+      _customSurface = color.ToString(MudBlazor.Utilities.MudColorOutputFormats.Hex);
+      await SaveSettingsAsync();
    }
 
    private async Task SaveSettingsAsync() {

@@ -51,6 +51,12 @@
         }
     </div>
 
+    <MudFab StartIcon="@Icons.Material.Filled.Add"
+            Color="Color.Primary"
+            Size="Size.Large"
+            Class="mobile-quick-add-fab"
+            OnClick="OpenQuickAddTask" />
+
     <MobileBottomBar ActiveTab="_activeTab"
                      ListLetter="@GetSelectedListLetter()"
                      ListName="@GetSelectedListName()"
@@ -168,6 +174,20 @@
             var newList = await ListService.CreateAsync(modalResult.Name, modalResult.Color, modalResult.Description);
             await LoadTaskLists();
             SelectList(newList.Id);
+        }
+    }
+
+    private async Task OpenQuickAddTask() {
+        var parameters = new DialogParameters<MobileQuickAddTaskModal> {
+            { x => x.TaskLists, _taskLists }
+        };
+
+        var dialog = await DialogService.ShowAsync<MobileQuickAddTaskModal>("Add Task", parameters);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled) {
+            await LoadTaskLists();
+            StateHasChanged();
         }
     }
 

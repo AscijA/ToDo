@@ -1,0 +1,61 @@
+<div>
+   <div class="d-flex align-center justify-space-between">
+      <MudText Typo="Typo.subtitle1">Recent sync activity</MudText>
+      @if (Entries.Count > 0) {
+         <MudIconButton Icon="@Icons.Material.Filled.DeleteSweep"
+                        aria-label="Clear sync activity"
+                        Size="Size.Small"
+                        Color="Color.Default"
+                        OnClick="OnClear" />
+      }
+   </div>
+
+   @if (Entries.Count == 0) {
+      <MudText Typo="Typo.body2" Color="Color.Secondary">No sync activity yet.</MudText>
+   }
+   else {
+      <MudList T="SyncActivityLogEntry" Dense="true">
+         @foreach (var entry in Entries.Take(6)) {
+            <MudListItem T="SyncActivityLogEntry">
+               <div class="d-flex align-start gap-2 mud-width-full">
+                  <MudIcon Icon="@GetIcon(entry.Status)"
+                           Color="@GetColor(entry.Status)"
+                           Size="Size.Small" />
+                  <div class="d-flex flex-column">
+                     <MudText Typo="Typo.body2">@entry.Message</MudText>
+                     <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        @entry.DeviceName - @entry.At.ToLocalTime().ToString("dd.MM. HH:mm")
+                     </MudText>
+                  </div>
+               </div>
+            </MudListItem>
+         }
+      </MudList>
+   }
+</div>
+
+@code {
+   [Parameter]
+   public IReadOnlyList<SyncActivityLogEntry> Entries { get; set; } = [];
+
+   [Parameter]
+   public EventCallback OnClear { get; set; }
+
+   private static string GetIcon(SyncActivityStatus status) {
+      return status switch {
+         SyncActivityStatus.Success => Icons.Material.Filled.CheckCircle,
+         SyncActivityStatus.Warning => Icons.Material.Filled.Warning,
+         SyncActivityStatus.Error => Icons.Material.Filled.Error,
+         _ => Icons.Material.Filled.Info
+      };
+   }
+
+   private static Color GetColor(SyncActivityStatus status) {
+      return status switch {
+         SyncActivityStatus.Success => Color.Success,
+         SyncActivityStatus.Warning => Color.Warning,
+         SyncActivityStatus.Error => Color.Error,
+         _ => Color.Info
+      };
+   }
+}

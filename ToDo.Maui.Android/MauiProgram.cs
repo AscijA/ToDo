@@ -37,6 +37,7 @@ public static class MauiProgram {
         builder.Services.AddSingleton<IAppVersionService>(_ => new AppVersionService(AppInfo.Current.Version.ToString()));
         builder.Services.AddSingleton<SyncDataRefreshService>();
         builder.Services.AddSingleton<SyncChangeTracker>();
+        builder.Services.AddSingleton<SyncActivityLogService>();
         builder.Services.AddSingleton<ISyncDiscoveryService, ManualAddressSyncDiscoveryService>();
         builder.Services.AddSingleton<ISyncSnapshotService, SyncSnapshotService>();
         builder.Services.AddSingleton<ISyncSnapshotImportService, SyncSnapshotImportService>();

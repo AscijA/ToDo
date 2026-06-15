@@ -37,7 +37,8 @@
 							  aria-label="@(_expanded ? "Hide menu" : "Show menu")"
 							  Size="Size.Small"
 							  Class="@($"sidebar-toggle-arrow {(_expanded ? "rotated" : "")}")"
-							  OnClick="() => _expanded = !_expanded" />
+							  OnClick="() => _expanded = !_expanded"
+							  Ripple="false" />
 			<MudIconButton Icon="@Icons.Material.Filled.Settings"
 							  aria-label="Settings"
 							  Color="@(ActivePage == DesktopPage.Settings ? Color.Primary : Color.Default)"

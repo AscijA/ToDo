@@ -20,7 +20,10 @@ public sealed record PairedSyncDevice(
     DateTimeOffset PairedAt,
     DateTimeOffset? LastSyncedAt,
     bool IsOnline,
-    string TrustToken);
+    string TrustToken,
+    int FailedSyncAttempts = 0,
+    DateTimeOffset? NextRetryAt = null,
+    string? LastSyncError = null);
 
 public sealed record SyncPairingSession(
     string DeviceId,
@@ -102,7 +105,8 @@ public sealed record SyncSnapshotResponse(
     IReadOnlyList<SyncTaskListItemSnapshot> TaskListItems,
     IReadOnlyList<SyncDailyOccurrenceSnapshot> DailyOccurrences,
     IReadOnlyList<SyncWeeklyOccurrenceSnapshot> WeeklyOccurrences,
-    IReadOnlyList<SyncMonthlyOccurrenceSnapshot> MonthlyOccurrences);
+    IReadOnlyList<SyncMonthlyOccurrenceSnapshot> MonthlyOccurrences,
+    IReadOnlyList<SyncDeletedEntitySnapshot> DeletedEntities);
 
 public sealed record SyncPreviewSummary(
     string DeviceName,
@@ -194,6 +198,10 @@ public sealed record SyncMonthlyOccurrenceSnapshot(
     bool IsDone,
     int? DayOfMonth,
     DateTimeOffset LastModifiedAt);
+
+public sealed record SyncDeletedEntitySnapshot(
+    Guid Id,
+    DateTimeOffset DeletedAt);
 
 public sealed record IncomingPairingRequest(
     string SessionId,

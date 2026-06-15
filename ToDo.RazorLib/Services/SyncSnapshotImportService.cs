@@ -256,9 +256,13 @@ public sealed class SyncSnapshotImportService : ISyncSnapshotImportService {
             .Select(occurrence => (occurrence.Id, occurrence.LastModifiedAt)));
         AddImportCount(importCounts, "monthly planner items", monthlyOccurrencesToAdd.Count + updatedMonthlyOccurrences, skippedMonthlyOccurrences);
 
+        var deletedEntities = await ApplyRemoteDeletionsAsync(context, snapshot.DeletedEntities ?? [], cancellationToken);
+        AddImportCount(importCounts, "deleted items", deletedEntities.Count, 0);
+
         await context.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         changeTracker.MarkImported(importedEntityChanges);
+        changeTracker.MarkRemoteDeleted(deletedEntities);
 
         var import = new SyncImportSummary(snapshot.DeviceName, importCounts);
         if (import.ImportedCount > 0) {
@@ -305,5 +309,61 @@ public sealed class SyncSnapshotImportService : ISyncSnapshotImportService {
 
     private bool IsRemoteNewer(Guid entityId, DateTimeOffset remoteLastModifiedAt) {
         return remoteLastModifiedAt > changeTracker.GetLastModified(entityId);
+    }
+
+    private async Task<List<SyncDeletedEntitySnapshot>> ApplyRemoteDeletionsAsync(
+        TodoDbContext context,
+        IReadOnlyList<SyncDeletedEntitySnapshot> deletedEntities,
+        CancellationToken cancellationToken) {
+        var appliedDeletions = new List<SyncDeletedEntitySnapshot>();
+
+        foreach (var deletedEntity in deletedEntities) {
+            if (!IsRemoteNewer(deletedEntity.Id, deletedEntity.DeletedAt)) {
+                continue;
+            }
+
+            if (await RemoveByIdAsync(context, deletedEntity.Id, cancellationToken)) {
+                appliedDeletions.Add(deletedEntity);
+            }
+        }
+
+        return appliedDeletions;
+    }
+
+    private static async Task<bool> RemoveByIdAsync(
+        TodoDbContext context,
+        Guid id,
+        CancellationToken cancellationToken) {
+        var dailyOccurrence = await context.DailyOccurrences.FindAsync(new object[] { id }, cancellationToken);
+        if (dailyOccurrence != null) {
+            context.DailyOccurrences.Remove(dailyOccurrence);
+            return true;
+        }
+
+        var weeklyOccurrence = await context.WeeklyOccurrences.FindAsync(new object[] { id }, cancellationToken);
+        if (weeklyOccurrence != null) {
+            context.WeeklyOccurrences.Remove(weeklyOccurrence);
+            return true;
+        }
+
+        var monthlyOccurrence = await context.MonthlyOccurrences.FindAsync(new object[] { id }, cancellationToken);
+        if (monthlyOccurrence != null) {
+            context.MonthlyOccurrences.Remove(monthlyOccurrence);
+            return true;
+        }
+
+        var taskListItem = await context.TaskListItems.FindAsync(new object[] { id }, cancellationToken);
+        if (taskListItem != null) {
+            context.TaskListItems.Remove(taskListItem);
+            return true;
+        }
+
+        var taskList = await context.TaskLists.FindAsync(new object[] { id }, cancellationToken);
+        if (taskList != null) {
+            context.TaskLists.Remove(taskList);
+            return true;
+        }
+
+        return false;
     }
 }

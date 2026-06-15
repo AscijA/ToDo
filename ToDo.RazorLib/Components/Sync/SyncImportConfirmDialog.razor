@@ -5,7 +5,7 @@
 		<div @onkeydown="HandleKeyDown">
 			<MudStack Spacing="3">
 				<MudText Typo="Typo.body2">
-					Import remote-new items from @Preview.DeviceName. Existing, changed, and local-only items will not be overwritten or deleted.
+					Review changes from @Preview.DeviceName. New items and newer remote changes can be applied; local-only items are kept.
 				</MudText>
 
 				<MudPaper Class="pa-3" Elevation="0" Outlined="true">
@@ -23,7 +23,7 @@
 
 				@if (Preview.ChangedCount > 0) {
 					<MudAlert Severity="Severity.Warning" Dense="true">
-						Changed items are conflicts and will be skipped for now.
+						Changed items are only applied when the remote copy is newer than the local copy.
 					</MudAlert>
 
 					<MudStack Spacing="2">
@@ -53,7 +53,9 @@
 	</DialogContent>
 	<DialogActions>
 		<MudButton OnClick="Cancel">Cancel</MudButton>
-		<MudButton Color="Color.Primary" OnClick="Confirm">Import New</MudButton>
+		@if (AllowConfirm) {
+			<MudButton Color="Color.Primary" OnClick="Confirm">Apply Remote Changes</MudButton>
+		}
 	</DialogActions>
 </MudDialog>
 
@@ -63,13 +65,16 @@
 	[Parameter, EditorRequired]
 	public SyncPreviewSummary Preview { get; set; } = null!;
 
+	[Parameter]
+	public bool AllowConfirm { get; set; } = true;
+
 	private async Task HandleKeyDown(KeyboardEventArgs args) {
 		if (args.Key == "Escape") {
 			Cancel();
 			return;
 		}
 
-		if (args.Key == "Enter") {
+		if (AllowConfirm && args.Key == "Enter") {
 			Confirm();
 			await Task.CompletedTask;
 		}

@@ -8,6 +8,7 @@ public sealed class AutoSyncChangeNotifier : IDataChangeNotifier, IDisposable {
 
     private readonly ISyncService syncService;
     private readonly SyncChangeTracker changeTracker;
+    private readonly SyncActivityLogService activityLog;
     private readonly ILogger<AutoSyncChangeNotifier>? logger;
     private readonly object gate = new();
     private readonly SemaphoreSlim syncLock = new(1, 1);
@@ -17,18 +18,36 @@ public sealed class AutoSyncChangeNotifier : IDataChangeNotifier, IDisposable {
     public AutoSyncChangeNotifier(
         ISyncService syncService,
         SyncChangeTracker changeTracker,
+        SyncActivityLogService activityLog,
         ILogger<AutoSyncChangeNotifier>? logger = null) {
         this.syncService = syncService;
         this.changeTracker = changeTracker;
+        this.activityLog = activityLog;
         this.logger = logger;
     }
 
-    public void NotifyChanged() {
+    public void NotifyChanged(params Guid[] entityIds) {
         if (disposed) {
             return;
         }
 
-        changeTracker.MarkLocalChange();
+        changeTracker.MarkLocalChange(entityIds);
+        ScheduleSyncIfEnabled();
+    }
+
+    public void NotifyDeleted(params Guid[] entityIds) {
+        if (disposed) {
+            return;
+        }
+
+        changeTracker.MarkDeleted(entityIds);
+        ScheduleSyncIfEnabled();
+    }
+
+    private void ScheduleSyncIfEnabled() {
+        if (disposed) {
+            return;
+        }
 
         var identity = syncService.GetLocalDevice();
         if (!identity.SyncEnabled || !identity.AutoSyncOnChanges || syncService.GetPairedDevices().Count == 0) {
@@ -68,12 +87,19 @@ public sealed class AutoSyncChangeNotifier : IDataChangeNotifier, IDisposable {
 
             foreach (var device in syncService.GetPairedDevices()) {
                 cancellationToken.ThrowIfCancellationRequested();
+                if (device.NextRetryAt is { } nextRetryAt && nextRetryAt > DateTimeOffset.Now) {
+                    activityLog.AddWarning(device.DeviceName, $"Auto sync will retry after {nextRetryAt.ToLocalTime():HH:mm}.");
+                    continue;
+                }
+
                 try {
                     await syncService.PushLocalNewAsync(device, cancellationToken);
-                    await syncService.ImportRemoteNewAsync(device, cancellationToken);
+                    var import = await syncService.ImportRemoteNewAsync(device, cancellationToken);
+                    activityLog.AddSuccess(device.DeviceName, $"Auto sync finished. Received {import.ImportedCount} change(s).");
                 }
                 catch (Exception ex) {
                     logger?.LogWarning(ex, "Auto sync from paired device {DeviceName} failed.", device.DeviceName);
+                    activityLog.AddError(device.DeviceName, SyncUserMessages.Explain(ex));
                 }
             }
         }

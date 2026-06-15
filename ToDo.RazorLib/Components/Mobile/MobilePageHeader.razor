@@ -4,11 +4,14 @@
      @onclick="HandleHeaderClick"
      @onkeydown="HandleHeaderKeyDown">
    @if (ShowBackButton) {
-      <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
-                     aria-label="Back"
-                     Color="Color.Primary"
-                     Size="Size.Small"
-                     tabindex="-1" />
+      <span @onclick:stopPropagation="true">
+         <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
+                        aria-label="Back"
+                        Color="Color.Primary"
+                        Size="Size.Small"
+                        OnClick="OnBack"
+                        Ripple="false" />
+      </span>
    }
    else if (!string.IsNullOrEmpty(Icon)) {
       <MudIconButton Icon="@Icon" Size="Size.Small" Color="Color.Secondary" OnClick="() => { }" Ripple="false"/>

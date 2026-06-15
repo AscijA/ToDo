@@ -8,6 +8,14 @@
 			<MudText Typo="Typo.caption" Color="@(Device.IsOnline ? Color.Success : Color.Secondary)">
 				@(Device.IsOnline ? "Online" : "Offline") - @Device.Address
 			</MudText>
+			@if (Device.NextRetryAt is { } nextRetryAt && nextRetryAt > DateTimeOffset.Now) {
+				<MudText Typo="Typo.caption" Color="Color.Warning">
+					Retry after @nextRetryAt.ToLocalTime().ToString("HH:mm")
+				</MudText>
+			}
+			else if (!string.IsNullOrWhiteSpace(Device.LastSyncError)) {
+				<MudText Typo="Typo.caption" Color="Color.Warning">@Device.LastSyncError</MudText>
+			}
 		</MudStack>
 		<MudSpacer />
 		<MudIconButton Icon="@Icons.Material.Filled.MoreVert"

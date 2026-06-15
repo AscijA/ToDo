@@ -23,7 +23,7 @@ public class DatabaseInitializer {
     private static async Task EnsureSchemaUpdatesAsync(TodoDbContext context) {
         var conn = context.Database.GetDbConnection();
         await conn.OpenAsync();
-        using var cmd = conn.CreateCommand();
+        using var cmd = conn.CreateCommand();   
         cmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('TaskLists') WHERE name='Position'";
         var exists = Convert.ToInt64(await cmd.ExecuteScalarAsync()) > 0;
         if (!exists) {

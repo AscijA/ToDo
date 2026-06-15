@@ -1,0 +1,269 @@
+@using ToDo.Application.Contracts.DTOs
+@using ToDo.Application.Interfaces.Services
+@inject IDailyPlanService DailyPlanService
+@inject ITaskListService TaskListService
+
+<MudDialog>
+    <DialogContent>
+        <div class="quick-add-modal" @onkeydown="HandleKeyDown">
+            <MudTextField @bind-Value="_title"
+                          Label="Title"
+                          @ref="_titleField"
+                          Margin="Margin.Dense" />
+
+            <MudTextField @bind-Value="_description"
+                          Label="Description"
+                          Lines="3"
+                          Margin="Margin.Dense" />
+
+            <MudDivider Class="my-3" />
+
+            <MudText Typo="Typo.subtitle2" Class="mb-2">Plans</MudText>
+
+            <div class="quick-add-row">
+                <MudCheckBox @bind-Value="_dailyEnabled" Color="Color.Primary" Label="Daily" />
+                <MudDatePicker @bind-Date="_dailyDate" Label="Date" Disabled="!_dailyEnabled" DateFormat="dd.MM.yyyy" Margin="Margin.Dense" />
+                <MudTextField @bind-Value="_timeslot" Label="Time" Disabled="!_dailyEnabled" Placeholder="09:00" Mask="@(new PatternMask("00:00"))" Margin="Margin.Dense" />
+            </div>
+
+            <div class="quick-add-row">
+                <MudCheckBox @bind-Value="_weeklyEnabled" Color="Color.Primary" Label="Weekly" />
+                <MudDatePicker Date="_weeklyDate"
+                               DateChanged="OnWeeklyDateChanged"
+                               Converter="_weekDateConverter"
+                               Label="Week"
+                               Disabled="!_weeklyEnabled"
+                               ShowWeekNumbers="true"
+                               Editable="false"
+                               Margin="Margin.Dense" />
+                <MudSelect T="DayOfWeek?" @bind-Value="_weekDay" Label="Day" Disabled="!_weeklyEnabled" Margin="Margin.Dense">
+                    <MudSelectItem T="DayOfWeek?" Value="@null">No day</MudSelectItem>
+                    <MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Monday">Monday</MudSelectItem>
+                    <MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Tuesday">Tuesday</MudSelectItem>
+                    <MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Wednesday">Wednesday</MudSelectItem>
+                    <MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Thursday">Thursday</MudSelectItem>
+                    <MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Friday">Friday</MudSelectItem>
+                    <MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Saturday">Saturday</MudSelectItem>
+                    <MudSelectItem T="DayOfWeek?" Value="DayOfWeek.Sunday">Sunday</MudSelectItem>
+                </MudSelect>
+            </div>
+
+            <div class="quick-add-row">
+                <MudCheckBox @bind-Value="_monthlyEnabled" Color="Color.Primary" Label="Monthly" />
+                <MudDatePicker Date="_monthlyDate"
+                               DateChanged="OnMonthlyDateChanged"
+                               Text="@GetMonthText(_monthlyDate)"
+                               Label="Month"
+                               Disabled="!_monthlyEnabled"
+                               OpenTo="OpenTo.Month"
+                               DateFormat="MMMM yyyy"
+                               Margin="Margin.Dense" />
+                <MudNumericField T="int?" @bind-Value="_dayOfMonth" Label="Day" Min="1" Max="31" Disabled="!_monthlyEnabled" Margin="Margin.Dense" />
+            </div>
+
+            <MudDivider Class="my-3" />
+
+            <MudText Typo="Typo.subtitle2" Class="mb-2">Task Lists</MudText>
+
+            <MudCheckBox T="bool"
+                         @bind-Value="_syncAcrossLists"
+                         Color="Color.Primary"
+                         Label="Sync across lists" />
+
+            @if (TaskLists.Count == 0) {
+                <MudText Typo="Typo.body2" Color="Color.Secondary">No task lists</MudText>
+            }
+            else {
+                <div class="quick-add-list">
+                    @foreach (var list in TaskLists) {
+                        <MudCheckBox T="bool"
+                                     Value="@IsTaskListSelected(list.Id)"
+                                     ValueChanged="@((bool selected) => SetTaskListSelected(list.Id, selected))"
+                                     Color="Color.Primary"
+                                     Label="@list.Name" />
+                    }
+                </div>
+            }
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit" Disabled="@(!CanSubmit())">Add</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public IReadOnlyList<TaskListDto> TaskLists { get; set; } = Array.Empty<TaskListDto>();
+
+    private string _title = string.Empty;
+    private string? _description;
+    private MudTextField<string>? _titleField;
+    private bool _dailyEnabled = true;
+    private DateTime? _dailyDate = DateTime.Today;
+    private string? _timeslot;
+    private bool _weeklyEnabled;
+    private DateTime? _weeklyDate = DateTime.Today;
+    private IReversibleConverter<DateTime?, string> _weekDateConverter = null!;
+    private DayOfWeek? _weekDay;
+    private bool _monthlyEnabled;
+    private DateTime? _monthlyDate = DateTime.Today;
+    private int? _dayOfMonth = DateTime.Today.Day;
+    private bool _syncAcrossLists = true;
+    private readonly HashSet<Guid> _selectedTaskListIds = new();
+
+    private void Cancel() => MudDialog.Cancel();
+
+    protected override void OnInitialized() {
+        _weekDateConverter = new WeekDateConverter(() => _weeklyDate);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender) {
+        if (firstRender && _titleField != null) {
+            await Task.Delay(100);
+            await _titleField.FocusAsync();
+        }
+    }
+
+    private bool IsTaskListSelected(Guid listId) => _selectedTaskListIds.Contains(listId);
+
+    private void SetTaskListSelected(Guid listId, bool selected) {
+        if (selected) {
+            _selectedTaskListIds.Add(listId);
+        }
+        else {
+            _selectedTaskListIds.Remove(listId);
+        }
+    }
+
+    private bool CanSubmit() {
+        return !string.IsNullOrWhiteSpace(_title)
+            && (_dailyEnabled || _weeklyEnabled || _monthlyEnabled || _selectedTaskListIds.Count > 0);
+    }
+
+    private bool HasSelectedPlans() => _dailyEnabled || _weeklyEnabled || _monthlyEnabled;
+
+    private static string GetWeekText(DateTime? date) {
+        if (!date.HasValue) {
+            return string.Empty;
+        }
+
+        return $"Week {System.Globalization.ISOWeek.GetWeekOfYear(date.Value)}";
+    }
+
+    private static string GetMonthText(DateTime? date) {
+        return date?.ToString("MMMM yyyy") ?? string.Empty;
+    }
+
+    private Task OnWeeklyDateChanged(DateTime? date) {
+        _weeklyDate = date;
+        return Task.CompletedTask;
+    }
+
+    private Task OnMonthlyDateChanged(DateTime? date) {
+        _monthlyDate = date.HasValue ? new DateTime(date.Value.Year, date.Value.Month, 1) : null;
+        if (date.HasValue) {
+            _dayOfMonth = Math.Min(_dayOfMonth ?? date.Value.Day, DateTime.DaysInMonth(date.Value.Year, date.Value.Month));
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs args) {
+        if (args.Key == "Escape") {
+            Cancel();
+            return;
+        }
+
+        if (args.Key == "Enter" && CanSubmit()) {
+            await Submit();
+        }
+    }
+
+    private async Task Submit() {
+        if (!CanSubmit()) {
+            return;
+        }
+
+        if (_syncAcrossLists) {
+            var taskDefinitionId = await TaskListService.CreateTaskAsync(_title.Trim(), _description, _selectedTaskListIds);
+            await AddTaskToSelectedPlans(taskDefinitionId);
+        }
+        else {
+            if (HasSelectedPlans()) {
+                var planTaskDefinitionId = await TaskListService.CreateTaskAsync(_title.Trim(), _description, Array.Empty<Guid>());
+                await AddTaskToSelectedPlans(planTaskDefinitionId);
+            }
+
+            foreach (var listId in _selectedTaskListIds) {
+                await TaskListService.CreateTaskAsync(_title.Trim(), _description, new[] { listId });
+            }
+        }
+
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private async Task AddTaskToSelectedPlans(Guid taskDefinitionId) {
+        if (_dailyEnabled) {
+            await DailyPlanService.AddTaskToDateAsync(DateOnly.FromDateTime(_dailyDate ?? DateTime.Today), new DailyItemDTO {
+                TaskDefinitionId = taskDefinitionId,
+                Title = _title.Trim(),
+                Description = _description,
+                Timeslot = _timeslot,
+                IsDone = false
+            });
+        }
+
+        if (_weeklyEnabled) {
+            var weeklyDate = DateOnly.FromDateTime(_weeklyDate ?? DateTime.Today);
+            await DailyPlanService.AddTaskToWeekAsync(weeklyDate, new WeeklyItemDTO {
+                TaskDefinitionId = taskDefinitionId,
+                Title = _title.Trim(),
+                Description = _description,
+                WeekDay = _weekDay,
+                Date = weeklyDate,
+                IsDone = false
+            });
+        }
+
+        if (_monthlyEnabled) {
+            var monthlyDate = DateOnly.FromDateTime(_monthlyDate ?? DateTime.Today);
+            await DailyPlanService.AddTaskToMonthAsync(monthlyDate, new MonthlyItemDTO {
+                TaskDefinitionId = taskDefinitionId,
+                Title = _title.Trim(),
+                Description = _description,
+                DayOfMonth = _dayOfMonth,
+                Date = monthlyDate,
+                IsDone = false
+            });
+        }
+    }
+
+    private sealed class WeekDateConverter : IReversibleConverter<DateTime?, string> {
+        private readonly Func<DateTime?> _currentDate;
+
+        public WeekDateConverter(Func<DateTime?> currentDate) {
+            _currentDate = currentDate;
+        }
+
+        public string Convert(DateTime? value) {
+            return GetWeekText(value);
+        }
+
+        public DateTime? ConvertBack(string value) {
+            if (string.IsNullOrWhiteSpace(value)) {
+                return null;
+            }
+
+            var digits = new string(value.Where(char.IsDigit).ToArray());
+            if (!int.TryParse(digits, out var weekNumber)) {
+                return _currentDate();
+            }
+
+            var year = (_currentDate() ?? DateTime.Today).Year;
+            return System.Globalization.ISOWeek.ToDateTime(year, weekNumber, DayOfWeek.Monday);
+        }
+    }
+}

@@ -1,0 +1,38 @@
+.quick-add-modal {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: min(360px, 86vw);
+}
+
+.quick-add-row {
+    display: grid;
+    grid-template-columns: minmax(92px, auto) minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px;
+    align-items: center;
+}
+
+.quick-add-list {
+    display: flex;
+    flex-direction: column;
+    max-height: 180px;
+    overflow-y: auto;
+}
+
+.quick-add-week-picker {
+    min-width: 0;
+}
+
+.quick-add-week-picker ::deep .mud-input-helper-text,
+.quick-add-week-picker ::deep .mud-input-helper-text *,
+.quick-add-week-picker ::deep .mud-input-error,
+.quick-add-week-picker ::deep .mud-form-helpertext {
+    display: none;
+}
+
+@media (max-width: 420px) {
+    .quick-add-row {
+        grid-template-columns: 1fr;
+        gap: 2px;
+    }
+}
