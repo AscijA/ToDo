@@ -66,6 +66,24 @@ public static class SyncUserMessages {
             return "The device answered, but it does not look like the paired device.";
         }
 
+        if (text.Contains("Push failed", StringComparison.OrdinalIgnoreCase)) {
+            if (text.Contains("Payload Too Large", StringComparison.OrdinalIgnoreCase) ||
+                text.Contains("request is too large", StringComparison.OrdinalIgnoreCase)) {
+                return "There is too much data to send at once. Try syncing after both devices have received the latest changes.";
+            }
+
+            if (text.Contains("Device is not paired", StringComparison.OrdinalIgnoreCase) ||
+                text.Contains("Invalid trust token", StringComparison.OrdinalIgnoreCase)) {
+                return "This device is no longer trusted by the other device. Remove it and pair again.";
+            }
+
+            return "Could not send changes to the other device. Make sure Sync is turned on there and try again.";
+        }
+
+        if (text.Contains("Push returned an invalid response", StringComparison.OrdinalIgnoreCase)) {
+            return "The other device answered, but it did not confirm the sync correctly.";
+        }
+
         if (text.Contains("No connection could be made", StringComparison.OrdinalIgnoreCase) ||
             text.Contains("actively refused", StringComparison.OrdinalIgnoreCase) ||
             text.Contains("Connection refused", StringComparison.OrdinalIgnoreCase)) {

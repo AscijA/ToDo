@@ -10,7 +10,10 @@ public interface ISyncService {
     Task<PairedSyncDevice> PingPairedDeviceAsync(PairedSyncDevice device, CancellationToken cancellationToken = default);
     Task<SyncSnapshotResponse> FetchSnapshotAsync(PairedSyncDevice device, CancellationToken cancellationToken = default);
     Task<SyncPreviewSummary> PreviewSyncAsync(PairedSyncDevice device, CancellationToken cancellationToken = default);
-    Task<SyncImportSummary> ImportRemoteNewAsync(PairedSyncDevice device, CancellationToken cancellationToken = default);
+    Task<SyncImportSummary> ImportRemoteNewAsync(
+        PairedSyncDevice device,
+        SyncImportOptions? options = null,
+        CancellationToken cancellationToken = default);
     Task<SyncImportSummary> PushLocalNewAsync(PairedSyncDevice device, CancellationToken cancellationToken = default);
     void RemovePairedDevice(string deviceId);
 }

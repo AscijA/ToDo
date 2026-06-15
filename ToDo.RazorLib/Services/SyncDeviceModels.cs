@@ -144,6 +144,9 @@ public sealed record SyncImportSummary(
     public int SkippedCount => EntityCounts.Sum(count => count.SkippedCount);
 }
 
+public sealed record SyncImportOptions(
+    IReadOnlySet<Guid> KeepLocalEntityIds);
+
 public sealed record SyncEntityImportCount(
     string Name,
     int ImportedCount,

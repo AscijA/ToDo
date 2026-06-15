@@ -228,9 +228,10 @@ public sealed class LocalSyncService : ISyncService {
 
     public async Task<SyncImportSummary> ImportRemoteNewAsync(
         PairedSyncDevice device,
+        SyncImportOptions? options = null,
         CancellationToken cancellationToken = default) {
         var remoteSnapshot = await FetchSnapshotAsync(device, cancellationToken);
-        var import = await snapshotImportService.ImportNewAsync(remoteSnapshot, cancellationToken);
+        var import = await snapshotImportService.ImportNewAsync(remoteSnapshot, options, cancellationToken);
         AddOrReplacePairedDevice(CreateSuccessfulSyncDevice(device));
         return import;
     }

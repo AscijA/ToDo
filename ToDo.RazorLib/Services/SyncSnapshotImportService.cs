@@ -22,7 +22,9 @@ public sealed class SyncSnapshotImportService : ISyncSnapshotImportService {
 
     public async Task<SyncImportSummary> ImportNewAsync(
         SyncSnapshotResponse snapshot,
+        SyncImportOptions? options = null,
         CancellationToken cancellationToken = default) {
+        var keepLocalEntityIds = options?.KeepLocalEntityIds ?? new HashSet<Guid>();
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
 
@@ -43,7 +45,7 @@ public sealed class SyncSnapshotImportService : ISyncSnapshotImportService {
         context.TaskDefinitions.AddRange(taskDefinitionsToAdd);
         var updatedTaskDefinitions = 0;
         foreach (var remote in snapshot.TaskDefinitions.Where(task => existingTaskDefinitions.ContainsKey(task.Id))) {
-            if (!IsRemoteNewer(remote.Id, remote.LastModifiedAt)) {
+            if (!ShouldImportRemote(remote.Id, remote.LastModifiedAt, keepLocalEntityIds)) {
                 continue;
             }
 
@@ -53,9 +55,9 @@ public sealed class SyncSnapshotImportService : ISyncSnapshotImportService {
             updatedTaskDefinitions++;
         }
         importedEntityChanges.AddRange(snapshot.TaskDefinitions
-            .Where(task => !existingTaskDefinitionIds.Contains(task.Id) || IsRemoteNewer(task.Id, task.LastModifiedAt))
+            .Where(task => !existingTaskDefinitionIds.Contains(task.Id) || ShouldImportRemote(task.Id, task.LastModifiedAt, keepLocalEntityIds))
             .Select(task => (task.Id, task.LastModifiedAt)));
-        AddImportCount(importCounts, "task definitions", taskDefinitionsToAdd.Count + updatedTaskDefinitions, 0);
+        AddImportCount(importCounts, "task definitions", taskDefinitionsToAdd.Count + updatedTaskDefinitions, CountKeptLocal(snapshot.TaskDefinitions, task => task.Id, keepLocalEntityIds));
 
         var existingTaskLists = await context.TaskLists
             .ToDictionaryAsync(list => list.Id, cancellationToken);
@@ -73,7 +75,7 @@ public sealed class SyncSnapshotImportService : ISyncSnapshotImportService {
         context.TaskLists.AddRange(taskListsToAdd);
         var updatedTaskLists = 0;
         foreach (var remote in snapshot.TaskLists.Where(list => existingTaskLists.ContainsKey(list.Id))) {
-            if (!IsRemoteNewer(remote.Id, remote.LastModifiedAt)) {
+            if (!ShouldImportRemote(remote.Id, remote.LastModifiedAt, keepLocalEntityIds)) {
                 continue;
             }
 
@@ -85,9 +87,9 @@ public sealed class SyncSnapshotImportService : ISyncSnapshotImportService {
             updatedTaskLists++;
         }
         importedEntityChanges.AddRange(snapshot.TaskLists
-            .Where(list => !existingTaskListIds.Contains(list.Id) || IsRemoteNewer(list.Id, list.LastModifiedAt))
+            .Where(list => !existingTaskListIds.Contains(list.Id) || ShouldImportRemote(list.Id, list.LastModifiedAt, keepLocalEntityIds))
             .Select(list => (list.Id, list.LastModifiedAt)));
-        AddImportCount(importCounts, "task lists", taskListsToAdd.Count + updatedTaskLists, 0);
+        AddImportCount(importCounts, "task lists", taskListsToAdd.Count + updatedTaskLists, CountKeptLocal(snapshot.TaskLists, list => list.Id, keepLocalEntityIds));
 
         existingTaskDefinitionIds.UnionWith(taskDefinitionsToAdd.Select(task => task.Id));
         existingTaskListIds.UnionWith(taskListsToAdd.Select(list => list.Id));
@@ -112,7 +114,7 @@ public sealed class SyncSnapshotImportService : ISyncSnapshotImportService {
         context.TaskListItems.AddRange(taskListItemsToAdd);
         var updatedTaskListItems = 0;
         foreach (var remote in snapshot.TaskListItems.Where(item => existingTaskListItems.ContainsKey(item.Id))) {
-            if (!IsRemoteNewer(remote.Id, remote.LastModifiedAt) ||
+            if (!ShouldImportRemote(remote.Id, remote.LastModifiedAt, keepLocalEntityIds) ||
                 !existingTaskDefinitionIds.Contains(remote.TaskDefinitionId) ||
                 !existingTaskListIds.Contains(remote.TaskListId)) {
                 continue;
@@ -126,11 +128,11 @@ public sealed class SyncSnapshotImportService : ISyncSnapshotImportService {
             updatedTaskListItems++;
         }
         importedEntityChanges.AddRange(snapshot.TaskListItems
-            .Where(item => (!existingTaskListItemIds.Contains(item.Id) || IsRemoteNewer(item.Id, item.LastModifiedAt)) &&
+            .Where(item => (!existingTaskListItemIds.Contains(item.Id) || ShouldImportRemote(item.Id, item.LastModifiedAt, keepLocalEntityIds)) &&
                            existingTaskDefinitionIds.Contains(item.TaskDefinitionId) &&
                            existingTaskListIds.Contains(item.TaskListId))
             .Select(item => (item.Id, item.LastModifiedAt)));
-        AddImportCount(importCounts, "task list items", taskListItemsToAdd.Count + updatedTaskListItems, skippedTaskListItems);
+        AddImportCount(importCounts, "task list items", taskListItemsToAdd.Count + updatedTaskListItems, skippedTaskListItems + CountKeptLocal(snapshot.TaskListItems, item => item.Id, keepLocalEntityIds));
 
         var dailyPlanIdsByDate = await GetPlanIdsByDateAsync(context.DailyPlans, cancellationToken);
         var weeklyPlanIdsByDate = await GetPlanIdsByDateAsync(context.WeeklyPlans, cancellationToken);
@@ -161,7 +163,7 @@ public sealed class SyncSnapshotImportService : ISyncSnapshotImportService {
         context.DailyOccurrences.AddRange(dailyOccurrencesToAdd);
         var updatedDailyOccurrences = 0;
         foreach (var remote in snapshot.DailyOccurrences.Where(occurrence => existingDailyOccurrences.ContainsKey(occurrence.Id))) {
-            if (!IsRemoteNewer(remote.Id, remote.LastModifiedAt) ||
+            if (!ShouldImportRemote(remote.Id, remote.LastModifiedAt, keepLocalEntityIds) ||
                 !existingTaskDefinitionIds.Contains(remote.TaskDefinitionId)) {
                 continue;
             }
@@ -175,10 +177,10 @@ public sealed class SyncSnapshotImportService : ISyncSnapshotImportService {
             updatedDailyOccurrences++;
         }
         importedEntityChanges.AddRange(snapshot.DailyOccurrences
-            .Where(occurrence => (!existingDailyOccurrenceIds.Contains(occurrence.Id) || IsRemoteNewer(occurrence.Id, occurrence.LastModifiedAt)) &&
+            .Where(occurrence => (!existingDailyOccurrenceIds.Contains(occurrence.Id) || ShouldImportRemote(occurrence.Id, occurrence.LastModifiedAt, keepLocalEntityIds)) &&
                                  existingTaskDefinitionIds.Contains(occurrence.TaskDefinitionId))
             .Select(occurrence => (occurrence.Id, occurrence.LastModifiedAt)));
-        AddImportCount(importCounts, "daily planner items", dailyOccurrencesToAdd.Count + updatedDailyOccurrences, skippedDailyOccurrences);
+        AddImportCount(importCounts, "daily planner items", dailyOccurrencesToAdd.Count + updatedDailyOccurrences, skippedDailyOccurrences + CountKeptLocal(snapshot.DailyOccurrences, occurrence => occurrence.Id, keepLocalEntityIds));
 
         var existingWeeklyOccurrences = await context.WeeklyOccurrences
             .ToDictionaryAsync(occurrence => occurrence.Id, cancellationToken);
@@ -200,7 +202,7 @@ public sealed class SyncSnapshotImportService : ISyncSnapshotImportService {
         context.WeeklyOccurrences.AddRange(weeklyOccurrencesToAdd);
         var updatedWeeklyOccurrences = 0;
         foreach (var remote in snapshot.WeeklyOccurrences.Where(occurrence => existingWeeklyOccurrences.ContainsKey(occurrence.Id))) {
-            if (!IsRemoteNewer(remote.Id, remote.LastModifiedAt) ||
+            if (!ShouldImportRemote(remote.Id, remote.LastModifiedAt, keepLocalEntityIds) ||
                 !existingTaskDefinitionIds.Contains(remote.TaskDefinitionId)) {
                 continue;
             }
@@ -213,10 +215,10 @@ public sealed class SyncSnapshotImportService : ISyncSnapshotImportService {
             updatedWeeklyOccurrences++;
         }
         importedEntityChanges.AddRange(snapshot.WeeklyOccurrences
-            .Where(occurrence => (!existingWeeklyOccurrenceIds.Contains(occurrence.Id) || IsRemoteNewer(occurrence.Id, occurrence.LastModifiedAt)) &&
+            .Where(occurrence => (!existingWeeklyOccurrenceIds.Contains(occurrence.Id) || ShouldImportRemote(occurrence.Id, occurrence.LastModifiedAt, keepLocalEntityIds)) &&
                                  existingTaskDefinitionIds.Contains(occurrence.TaskDefinitionId))
             .Select(occurrence => (occurrence.Id, occurrence.LastModifiedAt)));
-        AddImportCount(importCounts, "weekly planner items", weeklyOccurrencesToAdd.Count + updatedWeeklyOccurrences, skippedWeeklyOccurrences);
+        AddImportCount(importCounts, "weekly planner items", weeklyOccurrencesToAdd.Count + updatedWeeklyOccurrences, skippedWeeklyOccurrences + CountKeptLocal(snapshot.WeeklyOccurrences, occurrence => occurrence.Id, keepLocalEntityIds));
 
         var existingMonthlyOccurrences = await context.MonthlyOccurrences
             .ToDictionaryAsync(occurrence => occurrence.Id, cancellationToken);
@@ -238,7 +240,7 @@ public sealed class SyncSnapshotImportService : ISyncSnapshotImportService {
         context.MonthlyOccurrences.AddRange(monthlyOccurrencesToAdd);
         var updatedMonthlyOccurrences = 0;
         foreach (var remote in snapshot.MonthlyOccurrences.Where(occurrence => existingMonthlyOccurrences.ContainsKey(occurrence.Id))) {
-            if (!IsRemoteNewer(remote.Id, remote.LastModifiedAt) ||
+            if (!ShouldImportRemote(remote.Id, remote.LastModifiedAt, keepLocalEntityIds) ||
                 !existingTaskDefinitionIds.Contains(remote.TaskDefinitionId)) {
                 continue;
             }
@@ -251,10 +253,10 @@ public sealed class SyncSnapshotImportService : ISyncSnapshotImportService {
             updatedMonthlyOccurrences++;
         }
         importedEntityChanges.AddRange(snapshot.MonthlyOccurrences
-            .Where(occurrence => (!existingMonthlyOccurrenceIds.Contains(occurrence.Id) || IsRemoteNewer(occurrence.Id, occurrence.LastModifiedAt)) &&
+            .Where(occurrence => (!existingMonthlyOccurrenceIds.Contains(occurrence.Id) || ShouldImportRemote(occurrence.Id, occurrence.LastModifiedAt, keepLocalEntityIds)) &&
                                  existingTaskDefinitionIds.Contains(occurrence.TaskDefinitionId))
             .Select(occurrence => (occurrence.Id, occurrence.LastModifiedAt)));
-        AddImportCount(importCounts, "monthly planner items", monthlyOccurrencesToAdd.Count + updatedMonthlyOccurrences, skippedMonthlyOccurrences);
+        AddImportCount(importCounts, "monthly planner items", monthlyOccurrencesToAdd.Count + updatedMonthlyOccurrences, skippedMonthlyOccurrences + CountKeptLocal(snapshot.MonthlyOccurrences, occurrence => occurrence.Id, keepLocalEntityIds));
 
         var deletedEntities = await ApplyRemoteDeletionsAsync(context, snapshot.DeletedEntities ?? [], cancellationToken);
         AddImportCount(importCounts, "deleted items", deletedEntities.Count, 0);
@@ -262,6 +264,9 @@ public sealed class SyncSnapshotImportService : ISyncSnapshotImportService {
         await context.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         changeTracker.MarkImported(importedEntityChanges);
+        if (keepLocalEntityIds.Count > 0) {
+            changeTracker.MarkLocalChange(keepLocalEntityIds.ToArray());
+        }
         changeTracker.MarkRemoteDeleted(deletedEntities);
 
         var import = new SyncImportSummary(snapshot.DeviceName, importCounts);
@@ -309,6 +314,20 @@ public sealed class SyncSnapshotImportService : ISyncSnapshotImportService {
 
     private bool IsRemoteNewer(Guid entityId, DateTimeOffset remoteLastModifiedAt) {
         return remoteLastModifiedAt > changeTracker.GetLastModified(entityId);
+    }
+
+    private bool ShouldImportRemote(
+        Guid entityId,
+        DateTimeOffset remoteLastModifiedAt,
+        IReadOnlySet<Guid> keepLocalEntityIds) {
+        return !keepLocalEntityIds.Contains(entityId) && IsRemoteNewer(entityId, remoteLastModifiedAt);
+    }
+
+    private static int CountKeptLocal<T>(
+        IEnumerable<T> items,
+        Func<T, Guid> getId,
+        IReadOnlySet<Guid> keepLocalEntityIds) {
+        return items.Count(item => keepLocalEntityIds.Contains(getId(item)));
     }
 
     private async Task<List<SyncDeletedEntitySnapshot>> ApplyRemoteDeletionsAsync(

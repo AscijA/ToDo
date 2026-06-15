@@ -1,5 +1,8 @@
 namespace ToDo.RazorLib.Services;
 
 public interface ISyncSnapshotImportService {
-    Task<SyncImportSummary> ImportNewAsync(SyncSnapshotResponse snapshot, CancellationToken cancellationToken = default);
+    Task<SyncImportSummary> ImportNewAsync(
+        SyncSnapshotResponse snapshot,
+        SyncImportOptions? options = null,
+        CancellationToken cancellationToken = default);
 }

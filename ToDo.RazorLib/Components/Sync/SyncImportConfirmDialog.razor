@@ -23,7 +23,7 @@
 
 				@if (Preview.ChangedCount > 0) {
 					<MudAlert Severity="Severity.Warning" Dense="true">
-						Changed items are only applied when the remote copy is newer than the local copy.
+						Changed items use the newer copy by default. Select any item you want to keep from this device.
 					</MudAlert>
 
 					<MudStack Spacing="2">
@@ -31,6 +31,10 @@
 						@foreach (var conflict in Preview.Conflicts.Take(20)) {
 							<MudPaper Class="pa-3" Elevation="0" Outlined="true">
 								<MudStack Spacing="1">
+									<MudCheckBox T="bool"
+												 Label="Keep this device's copy"
+												 Value="@_keepLocalConflictIds.Contains(conflict.Id)"
+												 ValueChanged="@((value) => SetKeepLocal(conflict.Id, value))" />
 									<MudText Typo="Typo.body2">@conflict.Label</MudText>
 									<MudText Typo="Typo.caption" Color="Color.Secondary">@conflict.EntityName</MudText>
 									@foreach (var field in conflict.Fields) {
@@ -68,6 +72,8 @@
 	[Parameter]
 	public bool AllowConfirm { get; set; } = true;
 
+	private readonly HashSet<Guid> _keepLocalConflictIds = [];
+
 	private async Task HandleKeyDown(KeyboardEventArgs args) {
 		if (args.Key == "Escape") {
 			Cancel();
@@ -82,5 +88,14 @@
 
 	private void Cancel() => MudDialog.Cancel();
 
-	private void Confirm() => MudDialog.Close(DialogResult.Ok(true));
+	private void Confirm() => MudDialog.Close(DialogResult.Ok(_keepLocalConflictIds.ToHashSet()));
+
+	private void SetKeepLocal(Guid conflictId, bool keepLocal) {
+		if (keepLocal) {
+			_keepLocalConflictIds.Add(conflictId);
+		}
+		else {
+			_keepLocalConflictIds.Remove(conflictId);
+		}
+	}
 }

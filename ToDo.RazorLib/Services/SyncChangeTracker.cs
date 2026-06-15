@@ -3,6 +3,8 @@ using System.Text.Json;
 namespace ToDo.RazorLib.Services;
 
 public sealed class SyncChangeTracker {
+    private static readonly TimeSpan DeletedEntityRetention = TimeSpan.FromDays(30);
+
     private const string LocalChangeKey = "Sync_LocalLastChangedAt";
     private const string EntityChangeKey = "Sync_EntityLastChangedAt";
     private const string DeletedEntityKey = "Sync_DeletedEntities";
@@ -51,11 +53,11 @@ public sealed class SyncChangeTracker {
     }
 
     public IReadOnlyDictionary<Guid, DateTimeOffset> GetDeletedEntities() {
-        return LoadDeletedEntities();
+        return LoadDeletedEntities(pruneExpired: true);
     }
 
     public void MarkDeleted(IEnumerable<Guid> entityIds) {
-        var deletedEntities = LoadDeletedEntities();
+        var deletedEntities = LoadDeletedEntities(pruneExpired: true);
         var deletedAt = DateTimeOffset.Now;
         foreach (var entityId in entityIds.Where(id => id != Guid.Empty)) {
             deletedEntities[entityId] = deletedAt;
@@ -66,7 +68,7 @@ public sealed class SyncChangeTracker {
     }
 
     public void MarkRemoteDeleted(IEnumerable<SyncDeletedEntitySnapshot> deletedEntities) {
-        var localDeletedEntities = LoadDeletedEntities();
+        var localDeletedEntities = LoadDeletedEntities(pruneExpired: true);
         foreach (var deletedEntity in deletedEntities) {
             localDeletedEntities[deletedEntity.Id] = deletedEntity.DeletedAt;
         }
@@ -94,17 +96,31 @@ public sealed class SyncChangeTracker {
         }
     }
 
-    private Dictionary<Guid, DateTimeOffset> LoadDeletedEntities() {
+    private Dictionary<Guid, DateTimeOffset> LoadDeletedEntities(bool pruneExpired = false) {
         var json = settings.Get(DeletedEntityKey, "");
         if (string.IsNullOrWhiteSpace(json)) {
             return [];
         }
 
         try {
-            return JsonSerializer.Deserialize<Dictionary<Guid, DateTimeOffset>>(json) ?? [];
+            var deletedEntities = JsonSerializer.Deserialize<Dictionary<Guid, DateTimeOffset>>(json) ?? [];
+            return pruneExpired ? PruneExpiredDeletedEntities(deletedEntities) : deletedEntities;
         }
         catch (JsonException) {
             return [];
         }
+    }
+
+    private Dictionary<Guid, DateTimeOffset> PruneExpiredDeletedEntities(Dictionary<Guid, DateTimeOffset> deletedEntities) {
+        var cutoff = DateTimeOffset.Now.Subtract(DeletedEntityRetention);
+        var pruned = deletedEntities
+            .Where(entity => entity.Value >= cutoff)
+            .ToDictionary(entity => entity.Key, entity => entity.Value);
+
+        if (pruned.Count != deletedEntities.Count) {
+            settings.Set(DeletedEntityKey, pruned.Count == 0 ? string.Empty : JsonSerializer.Serialize(pruned));
+        }
+
+        return pruned;
     }
 }

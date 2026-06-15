@@ -93,9 +93,14 @@ public sealed class AutoSyncChangeNotifier : IDataChangeNotifier, IDisposable {
                 }
 
                 try {
-                    await syncService.PushLocalNewAsync(device, cancellationToken);
-                    var import = await syncService.ImportRemoteNewAsync(device, cancellationToken);
-                    activityLog.AddSuccess(device.DeviceName, $"Auto sync finished. Received {import.ImportedCount} change(s).");
+                    var push = await syncService.PushLocalNewAsync(device, cancellationToken);
+                    var import = await syncService.ImportRemoteNewAsync(device, cancellationToken: cancellationToken);
+                    var skipped = push.SkippedCount + import.SkippedCount;
+                    var skippedText = skipped == 0
+                        ? string.Empty
+                        : $" {skipped} change(s) were already up to date or kept because this device had the newer copy.";
+
+                    activityLog.AddSuccess(device.DeviceName, $"Auto sync finished. Sent {push.ImportedCount} change(s), received {import.ImportedCount} change(s).{skippedText}");
                 }
                 catch (Exception ex) {
                     logger?.LogWarning(ex, "Auto sync from paired device {DeviceName} failed.", device.DeviceName);

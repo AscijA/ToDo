@@ -9,9 +9,7 @@
 			<MudStack Spacing="3">
 				<MudStack Spacing="0">
 					<MudText Typo="Typo.subtitle1">@Device.DeviceName</MudText>
-					<MudText Typo="Typo.caption" Color="@(Device.IsOnline ? Color.Success : Color.Secondary)">
-						@(Device.IsOnline ? "Online" : "Offline") - @Device.Address
-					</MudText>
+					<SyncPairedDeviceStatus Device="Device" />
 				</MudStack>
 
 				<MudButton StartIcon="@Icons.Material.Filled.Sync"
@@ -81,7 +79,7 @@
 						<MudProgressCircular Size="Size.Small" Indeterminate="true" />
 					}
 					else {
-						<span>Import New</span>
+						<span>Apply Remote Changes</span>
 					}
 				</MudButton>
 				<MudButton StartIcon="@Icons.Material.Filled.Delete"
@@ -202,6 +200,11 @@
 			var preview = await SyncService.PreviewSyncAsync(Device);
 			_messageSeverity = preview.ChangedCount == 0 ? Severity.Success : Severity.Warning;
 			_message = FormatPreviewMessage(preview);
+			var parameters = new DialogParameters {
+				[nameof(SyncImportConfirmDialog.Preview)] = preview,
+				[nameof(SyncImportConfirmDialog.AllowConfirm)] = false
+			};
+			await DialogService.ShowAsync<SyncImportConfirmDialog>("Sync Preview", parameters);
 		}
 		catch (Exception ex) {
 			_messageSeverity = Severity.Warning;
@@ -222,15 +225,22 @@
 			_message = FormatPreviewMessage(preview);
 
 			var parameters = new DialogParameters {
-				[nameof(SyncImportConfirmDialog.Preview)] = preview
+				[nameof(SyncImportConfirmDialog.Preview)] = preview,
+				[nameof(SyncImportConfirmDialog.AllowConfirm)] = true
 			};
-			var dialog = await DialogService.ShowAsync<SyncImportConfirmDialog>("Confirm Import", parameters);
+			var dialog = await DialogService.ShowAsync<SyncImportConfirmDialog>("Apply Remote Changes", parameters);
 			var result = await dialog.Result;
 			if (result?.Canceled != false) {
 				return;
 			}
 
-			var import = await SyncService.ImportRemoteNewAsync(Device);
+			var keepLocalEntityIds = result.Data is IReadOnlySet<Guid> selectedIds
+				? selectedIds
+				: new HashSet<Guid>();
+			var options = keepLocalEntityIds.Count == 0
+				? null
+				: new SyncImportOptions(keepLocalEntityIds);
+			var import = await SyncService.ImportRemoteNewAsync(Device, options);
 			_messageSeverity = import.SkippedCount == 0 ? Severity.Success : Severity.Warning;
 			_message = FormatImportMessage(import);
 			await OnDevicesChanged.InvokeAsync();
@@ -270,16 +280,21 @@
 	private static string FormatImportMessage(SyncImportSummary import) {
 		var details = string.Join("; ", import.EntityCounts
 			.Where(count => count.ImportedCount > 0 || count.SkippedCount > 0)
-			.Select(count => $"{count.Name}: imported {count.ImportedCount}, skipped {count.SkippedCount}"));
+			.Select(count => $"{count.Name}: applied {count.ImportedCount}, skipped {count.SkippedCount}"));
 
 		if (string.IsNullOrWhiteSpace(details)) {
-			details = "nothing new to import";
+			details = "nothing to apply";
 		}
 
-		return $"{import.DeviceName} import: {import.ImportedCount} imported, {import.SkippedCount} skipped. {details}.";
+		return $"{import.DeviceName} changes: {import.ImportedCount} applied, {import.SkippedCount} skipped. {details}.";
 	}
 
 	private static string FormatSyncNowMessage(SyncImportSummary push, SyncImportSummary import) {
-		return $"Sync complete. Sent {push.ImportedCount} new item(s) to {push.DeviceName}; received {import.ImportedCount} new item(s) from {import.DeviceName}.";
+		var skipped = push.SkippedCount + import.SkippedCount;
+		var skippedText = skipped == 0
+			? string.Empty
+			: $" {skipped} change(s) were already up to date or kept because your copy was newer.";
+
+		return $"Sync complete. Sent {push.ImportedCount} change(s) to {push.DeviceName}; received {import.ImportedCount} change(s) from {import.DeviceName}.{skippedText}";
 	}
 }

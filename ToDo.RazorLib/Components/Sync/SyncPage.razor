@@ -335,7 +335,7 @@
    private static string GetPairedDeviceSignature(IReadOnlyList<PairedSyncDevice> devices) {
       return string.Join('|', devices
          .OrderBy(device => device.DeviceId, StringComparer.OrdinalIgnoreCase)
-         .Select(device => $"{device.DeviceId}:{device.LastSyncedAt?.ToUnixTimeMilliseconds()}:{device.IsOnline}"));
+         .Select(device => $"{device.DeviceId}:{device.LastSyncedAt?.ToUnixTimeMilliseconds()}:{device.IsOnline}:{device.NextRetryAt?.ToUnixTimeMilliseconds()}:{device.LastSyncError}"));
    }
 
    public void Dispose() {

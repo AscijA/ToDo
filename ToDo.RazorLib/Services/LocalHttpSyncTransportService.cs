@@ -10,6 +10,7 @@ namespace ToDo.RazorLib.Services;
 [UnsupportedOSPlatform("browser")]
 public sealed class LocalHttpSyncTransportService : ISyncTransportService {
     private const int DefaultPort = 51234;
+    private const int MaxRequestBodyBytes = 10 * 1024 * 1024;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly object gate = new();
@@ -162,70 +163,75 @@ public sealed class LocalHttpSyncTransportService : ISyncTransportService {
         using var _ = client;
         using var stream = client.GetStream();
         using var reader = new StreamReader(stream, Encoding.ASCII, leaveOpen: true);
-        var requestLine = await reader.ReadLineAsync(cancellationToken);
-        if (string.IsNullOrWhiteSpace(requestLine)) {
-            return;
-        }
+        try {
+            var requestLine = await reader.ReadLineAsync(cancellationToken);
+            if (string.IsNullOrWhiteSpace(requestLine)) {
+                return;
+            }
 
-        var parts = requestLine.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length < 2) {
-            await WriteResponseAsync(stream, 405, "Method Not Allowed", "text/plain", "Method not allowed", cancellationToken);
-            return;
-        }
+            var parts = requestLine.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 2) {
+                await WriteResponseAsync(stream, 405, "Method Not Allowed", "text/plain", "Method not allowed", cancellationToken);
+                return;
+            }
 
-        var method = parts[0];
-        var path = parts[1];
+            var method = parts[0];
+            var path = parts[1];
 
-        if (string.Equals(method, "GET", StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(path, "/sync/hello", StringComparison.OrdinalIgnoreCase)) {
+            if (string.Equals(method, "GET", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(path, "/sync/hello", StringComparison.OrdinalIgnoreCase)) {
+                await ReadHeadersAsync(reader, cancellationToken);
+                await HandleHelloAsync(stream, cancellationToken);
+                return;
+            }
+
+            if (string.Equals(method, "POST", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(path, "/sync/pair/start", StringComparison.OrdinalIgnoreCase)) {
+                var body = await ReadBodyAsync(reader, cancellationToken);
+                await HandlePairStartAsync(stream, body, cancellationToken);
+                return;
+            }
+
+            if (string.Equals(method, "POST", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(path, "/sync/pair/confirm", StringComparison.OrdinalIgnoreCase)) {
+                var body = await ReadBodyAsync(reader, cancellationToken);
+                await HandlePairConfirmAsync(stream, body, cancellationToken);
+                return;
+            }
+
+            if (string.Equals(method, "POST", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(path, "/sync/ping", StringComparison.OrdinalIgnoreCase)) {
+                var body = await ReadBodyAsync(reader, cancellationToken);
+                await HandlePingAsync(stream, body, cancellationToken);
+                return;
+            }
+
+            if (string.Equals(method, "POST", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(path, "/sync/snapshot", StringComparison.OrdinalIgnoreCase)) {
+                var body = await ReadBodyAsync(reader, cancellationToken);
+                await HandleSnapshotAsync(stream, body, cancellationToken);
+                return;
+            }
+
+            if (string.Equals(method, "POST", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(path, "/sync/import-new", StringComparison.OrdinalIgnoreCase)) {
+                var body = await ReadBodyAsync(reader, cancellationToken);
+                await HandleImportNewAsync(stream, body, cancellationToken);
+                return;
+            }
+
+            if (!string.Equals(method, "GET", StringComparison.OrdinalIgnoreCase) && !string.Equals(method, "POST", StringComparison.OrdinalIgnoreCase)) {
+                await ReadHeadersAsync(reader, cancellationToken);
+                await WriteResponseAsync(stream, 405, "Method Not Allowed", "text/plain", "Method not allowed", cancellationToken);
+                return;
+            }
+
             await ReadHeadersAsync(reader, cancellationToken);
-            await HandleHelloAsync(stream, cancellationToken);
-            return;
+            await WriteResponseAsync(stream, 404, "Not Found", "text/plain", "Not found", cancellationToken);
         }
-
-        if (string.Equals(method, "POST", StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(path, "/sync/pair/start", StringComparison.OrdinalIgnoreCase)) {
-            var body = await ReadBodyAsync(reader, cancellationToken);
-            await HandlePairStartAsync(stream, body, cancellationToken);
-            return;
+        catch (RequestBodyTooLargeException) {
+            await WriteResponseAsync(stream, 413, "Payload Too Large", "text/plain", "Sync request is too large", cancellationToken);
         }
-
-        if (string.Equals(method, "POST", StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(path, "/sync/pair/confirm", StringComparison.OrdinalIgnoreCase)) {
-            var body = await ReadBodyAsync(reader, cancellationToken);
-            await HandlePairConfirmAsync(stream, body, cancellationToken);
-            return;
-        }
-
-        if (string.Equals(method, "POST", StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(path, "/sync/ping", StringComparison.OrdinalIgnoreCase)) {
-            var body = await ReadBodyAsync(reader, cancellationToken);
-            await HandlePingAsync(stream, body, cancellationToken);
-            return;
-        }
-
-        if (string.Equals(method, "POST", StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(path, "/sync/snapshot", StringComparison.OrdinalIgnoreCase)) {
-            var body = await ReadBodyAsync(reader, cancellationToken);
-            await HandleSnapshotAsync(stream, body, cancellationToken);
-            return;
-        }
-
-        if (string.Equals(method, "POST", StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(path, "/sync/import-new", StringComparison.OrdinalIgnoreCase)) {
-            var body = await ReadBodyAsync(reader, cancellationToken);
-            await HandleImportNewAsync(stream, body, cancellationToken);
-            return;
-        }
-
-        if (!string.Equals(method, "GET", StringComparison.OrdinalIgnoreCase) && !string.Equals(method, "POST", StringComparison.OrdinalIgnoreCase)) {
-            await ReadHeadersAsync(reader, cancellationToken);
-            await WriteResponseAsync(stream, 405, "Method Not Allowed", "text/plain", "Method not allowed", cancellationToken);
-            return;
-        }
-
-        await ReadHeadersAsync(reader, cancellationToken);
-        await WriteResponseAsync(stream, 404, "Not Found", "text/plain", "Not found", cancellationToken);
     }
 
     private async Task HandleHelloAsync(NetworkStream stream, CancellationToken cancellationToken) {
@@ -400,11 +406,16 @@ public sealed class LocalHttpSyncTransportService : ISyncTransportService {
             return;
         }
 
+        if (!string.Equals(request.Snapshot.ProtocolVersion, "1", StringComparison.Ordinal)) {
+            await WriteResponseAsync(stream, 400, "Bad Request", "text/plain", "Unsupported sync snapshot version", cancellationToken);
+            return;
+        }
+
         if (!await TryAuthorizePairedDeviceAsync(stream, request.DeviceId, request.TrustToken, cancellationToken)) {
             return;
         }
 
-        var import = await snapshotImportService.ImportNewAsync(request.Snapshot, cancellationToken);
+        var import = await snapshotImportService.ImportNewAsync(request.Snapshot, cancellationToken: cancellationToken);
         AddOrReplacePairedDevice(LoadPairedDevices()
             .First(device => string.Equals(device.DeviceId, request.DeviceId, StringComparison.OrdinalIgnoreCase))
             with { LastSyncedAt = DateTimeOffset.Now, IsOnline = true });
@@ -424,7 +435,7 @@ public sealed class LocalHttpSyncTransportService : ISyncTransportService {
             return false;
         }
 
-        if (!string.Equals(pairedDevice.TrustToken, trustToken, StringComparison.Ordinal)) {
+        if (!FixedTimeEquals(pairedDevice.TrustToken, trustToken)) {
             await WriteResponseAsync(stream, 403, "Forbidden", "text/plain", "Invalid trust token", cancellationToken);
             return false;
         }
@@ -460,6 +471,10 @@ public sealed class LocalHttpSyncTransportService : ISyncTransportService {
             const string prefix = "Content-Length:";
             if (line.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) &&
                 int.TryParse(line[prefix.Length..].Trim(), out var parsedLength)) {
+                if (parsedLength > MaxRequestBodyBytes) {
+                    throw new RequestBodyTooLargeException();
+                }
+
                 contentLength = parsedLength;
             }
         }
@@ -484,6 +499,16 @@ public sealed class LocalHttpSyncTransportService : ISyncTransportService {
         var json = JsonSerializer.Serialize(response, JsonOptions);
         return WriteResponseAsync(stream, 200, "OK", "application/json", json, cancellationToken);
     }
+
+    private static bool FixedTimeEquals(string left, string right) {
+        var leftBytes = Encoding.UTF8.GetBytes(left);
+        var rightBytes = Encoding.UTF8.GetBytes(right);
+
+        return leftBytes.Length == rightBytes.Length &&
+               CryptographicOperations.FixedTimeEquals(leftBytes, rightBytes);
+    }
+
+    private sealed class RequestBodyTooLargeException : Exception;
 
     private void AddOrReplacePairedDevice(PairedSyncDevice device) {
         var devices = LoadPairedDevices();

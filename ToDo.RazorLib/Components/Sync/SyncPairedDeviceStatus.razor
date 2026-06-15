@@ -1,0 +1,58 @@
+@using ToDo.RazorLib.Services
+
+<MudStack Spacing="0">
+	<MudText Typo="Typo.caption" Color="@StatusColor">
+		@StatusText
+	</MudText>
+	@if (Device.LastSyncedAt is { } lastSyncedAt) {
+		<MudText Typo="Typo.caption" Color="Color.Secondary">
+			Last synced @FormatRelativeTime(lastSyncedAt)
+		</MudText>
+	}
+	@if (Device.NextRetryAt is { } nextRetryAt && nextRetryAt > DateTimeOffset.Now) {
+		<MudText Typo="Typo.caption" Color="Color.Warning">
+			Will try again @FormatRelativeTime(nextRetryAt)
+		</MudText>
+	}
+	else if (!string.IsNullOrWhiteSpace(Device.LastSyncError)) {
+		<MudText Typo="Typo.caption" Color="Color.Warning">
+			@SyncUserMessages.Explain(Device.LastSyncError)
+		</MudText>
+	}
+</MudStack>
+
+@code {
+	[Parameter, EditorRequired]
+	public PairedSyncDevice Device { get; set; } = null!;
+
+	private Color StatusColor => Device.IsOnline ? Color.Success : Color.Secondary;
+
+	private string StatusText => $"{(Device.IsOnline ? "Online" : "Offline")} - {Device.Address}";
+
+	private static string FormatRelativeTime(DateTimeOffset value) {
+		var now = DateTimeOffset.Now;
+		var difference = value - now;
+		var absolute = difference.Duration();
+		var suffix = difference >= TimeSpan.Zero ? string.Empty : " ago";
+		var prefix = difference >= TimeSpan.Zero ? "in " : string.Empty;
+
+		if (absolute < TimeSpan.FromMinutes(1)) {
+			return difference >= TimeSpan.Zero ? "soon" : "just now";
+		}
+
+		if (absolute < TimeSpan.FromHours(1)) {
+			var minutes = Math.Max(1, (int)Math.Round(absolute.TotalMinutes));
+			return $"{prefix}{minutes} minute{Plural(minutes)}{suffix}";
+		}
+
+		if (absolute < TimeSpan.FromDays(1)) {
+			var hours = Math.Max(1, (int)Math.Round(absolute.TotalHours));
+			return $"{prefix}{hours} hour{Plural(hours)}{suffix}";
+		}
+
+		var days = Math.Max(1, (int)Math.Round(absolute.TotalDays));
+		return $"{prefix}{days} day{Plural(days)}{suffix}";
+	}
+
+	private static string Plural(int value) => value == 1 ? string.Empty : "s";
+}
