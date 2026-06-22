@@ -1,9 +1,13 @@
 using ToDo.Maui.Windows.Services;
+using ToDo.RazorLib.Services;
 
 namespace ToDo.Maui.Windows;
 
 public partial class App : Microsoft.Maui.Controls.Application {
-    public App(DatabaseInitializer initializer) {
+    private readonly SyncStartupService syncStartupService;
+
+    public App(DatabaseInitializer initializer, SyncStartupService syncStartupService) {
+        this.syncStartupService = syncStartupService;
         InitializeComponent();
 
         try {
@@ -12,6 +16,8 @@ public partial class App : Microsoft.Maui.Controls.Application {
         catch (Exception ex) {
             Console.WriteLine($"Database Init Failed: {ex.Message}");
         }
+
+        RunSyncStartupInBackground("Sync Startup Failed");
     }
 
     protected override Window CreateWindow(IActivationState? activationState) {
@@ -24,5 +30,20 @@ public partial class App : Microsoft.Maui.Controls.Application {
                 Icon = "Resources/AppIcon/appicon.ico"
             }
         };
+    }
+
+    protected override void OnResume() {
+        RunSyncStartupInBackground("Sync Resume Failed");
+    }
+
+    private void RunSyncStartupInBackground(string errorPrefix) {
+        _ = Task.Run(async () => {
+            try {
+                await syncStartupService.InitializeAsync();
+            }
+            catch (Exception ex) {
+                Console.WriteLine($"{errorPrefix}: {ex.Message}");
+            }
+        });
     }
 }

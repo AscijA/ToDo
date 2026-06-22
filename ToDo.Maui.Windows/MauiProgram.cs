@@ -8,6 +8,7 @@ using ToDo.Infrastructure.Data;
 using ToDo.Maui.Windows.Platforms.Windows;
 using ToDo.Maui.Windows.Services;
 using ToDo.RazorLib.Services;
+using Microsoft.Windows.AppLifecycle;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using WinRT.Interop;
@@ -36,7 +37,11 @@ public static class MauiProgram {
 
                     var iconPath = GetWindowsIconPath();
                     appWindow.SetIcon(iconPath);
-                    TrayWindowService.Initialize(window, appWindow, hwnd, iconPath);
+                    TrayWindowService.Initialize(window, appWindow, iconPath);
+
+                    if (ShouldStartMinimized()) {
+                        window.DispatcherQueue.TryEnqueue(() => MinimizeWindow(appWindow));
+                    }
 
                     appWindow.Closing += (sender, args) => {
                         var mauiApp = Microsoft.Maui.Controls.Application.Current;
@@ -70,6 +75,8 @@ public static class MauiProgram {
         builder.Services.AddTransient<IMonthlyOccurrenceService, MonthlyOccurrenceService>();
         builder.Services.AddTransient<ITaskListService, TaskListService>();
         builder.Services.AddSingleton<ISettingsService, MauiSettingsService>();
+        builder.Services.AddSingleton<IStartupSettingsService, WindowsStartupSettingsService>();
+        builder.Services.AddSingleton<ISecureSettingsService, MauiSecureSettingsService>();
         builder.Services.AddSingleton<IAppVersionService>(_ => new AppVersionService(AppInfo.Current.Version.ToString()));
         builder.Services.AddSingleton<SyncDataRefreshService>();
         builder.Services.AddSingleton<SyncChangeTracker>();
@@ -79,7 +86,9 @@ public static class MauiProgram {
         builder.Services.AddSingleton<ISyncSnapshotImportService, SyncSnapshotImportService>();
         builder.Services.AddSingleton<ISyncTransportService, LocalHttpSyncTransportService>();
         builder.Services.AddSingleton<ISyncService, LocalSyncService>();
-        builder.Services.AddSingleton<IDataChangeNotifier, AutoSyncChangeNotifier>();
+        builder.Services.AddSingleton<SyncStartupService>();
+        builder.Services.AddSingleton<AutoSyncChangeNotifier>();
+        builder.Services.AddSingleton<IDataChangeNotifier>(provider => provider.GetRequiredService<AutoSyncChangeNotifier>());
         builder.Services.AddSingleton<SyncModalRequestService>();
         builder.Services.AddScoped<ThemeStoreInterop>();
 
@@ -95,5 +104,28 @@ public static class MauiProgram {
         };
 
         return candidates.FirstOrDefault(File.Exists) ?? candidates[0];
+    }
+
+    private static bool ShouldStartMinimized() {
+        var mauiApp = Microsoft.Maui.Controls.Application.Current;
+        var settings = mauiApp?.Handler?.MauiContext?.Services.GetService<ISettingsService>();
+        var startupMinimized = settings?.Get("StartupMinimized", "false") == "true";
+
+        return startupMinimized && IsStartupTaskActivation();
+    }
+
+    private static bool IsStartupTaskActivation() {
+        try {
+            return AppInstance.GetCurrent().GetActivatedEventArgs().Kind == ExtendedActivationKind.StartupTask;
+        }
+        catch {
+            return false;
+        }
+    }
+
+    private static void MinimizeWindow(AppWindow appWindow) {
+        if (appWindow.Presenter is OverlappedPresenter presenter) {
+            presenter.Minimize();
+        }
     }
 }

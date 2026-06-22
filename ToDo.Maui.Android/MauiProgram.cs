@@ -34,6 +34,8 @@ public static class MauiProgram {
         builder.Services.AddTransient<IMonthlyOccurrenceService, MonthlyOccurrenceService>();
         builder.Services.AddTransient<ITaskListService, TaskListService>();
         builder.Services.AddSingleton<ISettingsService, AndroidSettingsService>();
+        builder.Services.AddSingleton<IStartupSettingsService, NoOpStartupSettingsService>();
+        builder.Services.AddSingleton<ISecureSettingsService, AndroidSecureSettingsService>();
         builder.Services.AddSingleton<IAppVersionService>(_ => new AppVersionService(AppInfo.Current.Version.ToString()));
         builder.Services.AddSingleton<SyncDataRefreshService>();
         builder.Services.AddSingleton<SyncChangeTracker>();
@@ -43,7 +45,9 @@ public static class MauiProgram {
         builder.Services.AddSingleton<ISyncSnapshotImportService, SyncSnapshotImportService>();
         builder.Services.AddSingleton<ISyncTransportService, LocalHttpSyncTransportService>();
         builder.Services.AddSingleton<ISyncService, LocalSyncService>();
-        builder.Services.AddSingleton<IDataChangeNotifier, AutoSyncChangeNotifier>();
+        builder.Services.AddSingleton<SyncStartupService>();
+        builder.Services.AddSingleton<AutoSyncChangeNotifier>();
+        builder.Services.AddSingleton<IDataChangeNotifier>(provider => provider.GetRequiredService<AutoSyncChangeNotifier>());
         builder.Services.AddSingleton<SyncModalRequestService>();
         builder.Services.AddScoped<ThemeStoreInterop>();
 

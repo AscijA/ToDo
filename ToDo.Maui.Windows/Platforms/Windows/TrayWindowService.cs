@@ -14,7 +14,7 @@ internal static class TrayWindowService {
     private static Icon? icon;
     private static bool isExiting;
 
-    public static void Initialize(Microsoft.UI.Xaml.Window createdWindow, AppWindow createdAppWindow, IntPtr createdHwnd, string iconPath) {
+    public static void Initialize(Microsoft.UI.Xaml.Window createdWindow, AppWindow createdAppWindow, string iconPath) {
         window = createdWindow;
         appWindow = createdAppWindow;
 
@@ -42,6 +42,9 @@ internal static class TrayWindowService {
 
     public static void RestoreWindow() {
         appWindow?.Show();
+        if (appWindow?.Presenter is OverlappedPresenter presenter) {
+            presenter.Restore();
+        }
         window?.Activate();
     }
 

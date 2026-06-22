@@ -108,13 +108,16 @@ else {
 		SyncDataRefresh.RefreshRequested += OnSyncDataRefreshRequested;
 		isGroupedLayout = ShowLayoutToggle && SettingsService.Get(LayoutPrefKey, "1") == "2";
 		var savedDateStr = SettingsService.Get(DatePrefKey, string.Empty);
+		var currentWeekStart = GetWeekStart(DateOnly.FromDateTime(DateTime.Now));
 		if (!string.IsNullOrEmpty(savedDateStr) && DateOnly.TryParse(savedDateStr, out var parsedDate)) {
-			Date = GetWeekStart(parsedDate);
+			var savedWeekStart = GetWeekStart(parsedDate);
+			Date = savedWeekStart < currentWeekStart ? currentWeekStart : savedWeekStart;
 		}
 		else {
-			Date = GetWeekStart(DateOnly.FromDateTime(DateTime.Now));
+			Date = currentWeekStart;
 		}
 
+		SettingsService.Set(DatePrefKey, Date.ToString("yyyy-MM-dd"));
 		selectedDateTime = Date.ToDateTime(new TimeOnly(0, 0));
 		await LoadTasksAsync();
 	}

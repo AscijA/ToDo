@@ -11,10 +11,13 @@ namespace ToDo.RazorLib.Services;
 public sealed class LocalHttpSyncTransportService : ISyncTransportService {
     private const int DefaultPort = 51234;
     private const int MaxRequestBodyBytes = 10 * 1024 * 1024;
+    private const string PairedDevicesKey = "Sync_PairedDevices";
+    private const string PairedDeviceTrustTokenPrefix = "Sync_PairedDeviceTrustToken_";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly object gate = new();
     private readonly ISettingsService settings;
+    private readonly ISecureSettingsService secureSettings;
     private readonly ISyncSnapshotService snapshotService;
     private readonly ISyncSnapshotImportService snapshotImportService;
     private readonly Dictionary<string, PendingPairing> pendingPairings = new(StringComparer.OrdinalIgnoreCase);
@@ -26,9 +29,11 @@ public sealed class LocalHttpSyncTransportService : ISyncTransportService {
 
     public LocalHttpSyncTransportService(
         ISettingsService settings,
+        ISecureSettingsService secureSettings,
         ISyncSnapshotService snapshotService,
         ISyncSnapshotImportService snapshotImportService) {
         this.settings = settings;
+        this.secureSettings = secureSettings;
         this.snapshotService = snapshotService;
         this.snapshotImportService = snapshotImportService;
     }
@@ -520,14 +525,14 @@ public sealed class LocalHttpSyncTransportService : ISyncTransportService {
     }
 
     private List<PairedSyncDevice> LoadPairedDevices() {
-        const string key = "Sync_PairedDevices";
-        var json = settings.Get(key, "");
+        var json = settings.Get(PairedDevicesKey, "");
         if (string.IsNullOrWhiteSpace(json)) {
             return [];
         }
 
         try {
-            return JsonSerializer.Deserialize<List<PairedSyncDevice>>(json) ?? [];
+            var devices = JsonSerializer.Deserialize<List<PairedSyncDevice>>(json) ?? [];
+            return devices.Select(HydrateTrustToken).ToList();
         }
         catch (JsonException) {
             return [];
@@ -535,8 +540,14 @@ public sealed class LocalHttpSyncTransportService : ISyncTransportService {
     }
 
     private void SavePairedDevices(IReadOnlyList<PairedSyncDevice> devices) {
-        const string key = "Sync_PairedDevices";
-        settings.Set(key, JsonSerializer.Serialize(devices));
+        foreach (var device in devices.Where(device => !string.IsNullOrWhiteSpace(device.TrustToken))) {
+            secureSettings.Set(GetTrustTokenKey(device.DeviceId), device.TrustToken);
+        }
+
+        var storedDevices = devices
+            .Select(device => device with { TrustToken = string.Empty })
+            .ToList();
+        settings.Set(PairedDevicesKey, JsonSerializer.Serialize(storedDevices));
     }
 
     private static string GeneratePairingCode() {
@@ -548,6 +559,19 @@ public sealed class LocalHttpSyncTransportService : ISyncTransportService {
         Span<byte> bytes = stackalloc byte[32];
         RandomNumberGenerator.Fill(bytes);
         return Convert.ToBase64String(bytes);
+    }
+
+    private PairedSyncDevice HydrateTrustToken(PairedSyncDevice device) {
+        if (!string.IsNullOrWhiteSpace(device.TrustToken)) {
+            secureSettings.Set(GetTrustTokenKey(device.DeviceId), device.TrustToken);
+        }
+
+        var trustToken = secureSettings.Get(GetTrustTokenKey(device.DeviceId), device.TrustToken);
+        return device with { TrustToken = trustToken };
+    }
+
+    private static string GetTrustTokenKey(string deviceId) {
+        return $"{PairedDeviceTrustTokenPrefix}{deviceId}";
     }
 
     private static string NormalizePairingCode(string code) {

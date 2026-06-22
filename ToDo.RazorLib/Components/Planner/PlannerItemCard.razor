@@ -1,7 +1,7 @@
 @using ToDo.Application.Contracts.DTOs
 
 <MudForm Model="@Item" ReadOnly="ReadOnly" Class="@GetItemClass()" Style="@GetItemStyle()">
-   <div class="d-flex align-center gap-4">
+   <div class="planner-item-row d-flex align-center gap-4">
       <MudCheckBox @bind-Value="Item.IsDone"
                    @bind-Value:after="InvokeTitleChangedAsync"
                    Color="Color.Primary"
@@ -20,7 +20,7 @@
                     Label=""
                     Margin="Margin.Dense"
                     Underline="@(string.IsNullOrWhiteSpace(Item.Title))"
-                    Class="@(Item.IsDone ? "done-item" : string.Empty)" />
+                    Class="@GetTitleClass()" />
 
       <MudIconButton Icon="@Icons.Material.Filled.Info"
                      Color="Color.Primary"
@@ -85,7 +85,11 @@
    }
 
    private string GetItemClass() {
-      return GetAccentTint(Item.Color) != null ? "planner-item-tinted" : string.Empty;
+      return GetAccentTint(Item.Color) != null ? "planner-item-card planner-item-tinted" : "planner-item-card";
+   }
+
+   private string GetTitleClass() {
+      return Item.IsDone ? "planner-title-field done-item" : "planner-title-field";
    }
 
    private string GetItemStyle() {

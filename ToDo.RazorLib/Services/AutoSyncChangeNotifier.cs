@@ -44,6 +44,10 @@ public sealed class AutoSyncChangeNotifier : IDataChangeNotifier, IDisposable {
         ScheduleSyncIfEnabled();
     }
 
+    public Task SyncNowAsync(CancellationToken cancellationToken = default) {
+        return disposed ? Task.CompletedTask : SyncPairedDevicesAsync(cancellationToken);
+    }
+
     private void ScheduleSyncIfEnabled() {
         if (disposed) {
             return;

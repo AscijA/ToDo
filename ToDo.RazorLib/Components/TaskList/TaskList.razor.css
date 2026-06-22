@@ -1,8 +1,21 @@
+.tasklist-view {
+   width: 100%;
+   min-width: 0;
+   box-sizing: border-box;
+}
+
+.tasklist-items {
+   width: 100%;
+   min-width: 0;
+}
+
 .tasklist-item-dropzone {
    display: flex;
    flex-direction: column;
    gap: 4px;
    width: 100%;
+   min-width: 0;
+   box-sizing: border-box;
 }
 
 .tasklist-draggable-row {
@@ -10,6 +23,8 @@
    align-items: center;
    gap: 6px;
    width: 100%;
+   min-width: 0;
+   box-sizing: border-box;
    border-radius: 4px;
 }
 

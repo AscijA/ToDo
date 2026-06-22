@@ -1,3 +1,28 @@
+::deep .planner-item-card {
+   width: 100%;
+   min-width: 0;
+   box-sizing: border-box;
+}
+
+::deep .planner-item-row {
+   width: 100%;
+   min-width: 0;
+   box-sizing: border-box;
+}
+
+::deep .planner-title-field {
+   flex: 1 1 0;
+   width: auto;
+   min-width: 0;
+   max-width: 100%;
+}
+
+::deep .planner-title-field .mud-input-control,
+::deep .planner-title-field .mud-input {
+   width: 100%;
+   min-width: 0;
+}
+
 ::deep .planner-item-tinted {
    border-radius: 4px;
    padding: 0 6px;

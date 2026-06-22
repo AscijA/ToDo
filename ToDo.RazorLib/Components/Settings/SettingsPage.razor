@@ -1,5 +1,6 @@
 @using ToDo.RazorLib.Services
 @inject ISettingsService SettingsService
+@inject IStartupSettingsService StartupSettingsService
 @inject ThemeStoreInterop ThemeStore
 
 <MobilePageHeader Title="Settings"
@@ -45,6 +46,11 @@
    <MudSwitch T="bool" @bind-Value="_bigOnLeft" @bind-Value:after="SaveSettingsAsync" Label="Big Container on Left" Color="Color.Primary" />
    <MudSwitch T="bool" @bind-Value="_minimizeToTray" @bind-Value:after="SaveSettingsAsync" Label="Minimize to Tray on Close" Color="Color.Primary" />
 
+   @if (_startupSettingsState.IsSupported) {
+      <MudSwitch T="bool" @bind-Value="_startWithWindows" @bind-Value:after="SaveSettingsAsync" Label="Start with Windows" Color="Color.Primary" Disabled="@IsStartupRegistrationLocked" />
+      <MudSwitch T="bool" @bind-Value="_startupMinimized" @bind-Value:after="SaveSettingsAsync" Label="Startup Minimized" Color="Color.Primary" Disabled="@(!_startWithWindows)" />
+   }
+
    <MudSelect T="string" @bind-Value="_slotBig" @bind-Value:after="SaveSettingsAsync" Label="Big Slot">
       <MudSelectItem Value="@("Daily")">Daily Planner</MudSelectItem>
       <MudSelectItem Value="@("Weekly")">Weekly Planner</MudSelectItem>
@@ -81,7 +87,12 @@
    private string _slotBig = "Daily";
    private string _slotSmallTop = "Weekly";
    private string _slotSmallBottom = "Monthly";
+   private bool _startWithWindows;
+   private bool _lastStartWithWindows;
+   private bool _startupMinimized;
    private bool _minimizeToTray;
+   private StartupSettingsState _startupSettingsState = new(false, false, false, false);
+   private bool IsStartupRegistrationLocked => _startupSettingsState.IsDisabledByUser || _startupSettingsState.IsDisabledByPolicy;
 
    private string _customPrimary = "#C678DD";
    private string _customSecondary = "#61AFEF";
@@ -92,10 +103,11 @@
    private MudBlazor.Utilities.MudColor _customBackgroundColor = new("#282C34");
    private MudBlazor.Utilities.MudColor _customSurfaceColor = new("#21252B");
 
-   protected override void OnInitialized() {
+   protected override async Task OnInitializedAsync() {
       _appearance = SettingsService.Get("Appearance", "System");
       _themeName = SettingsService.Get("Theme", "ODP");
       _bigOnLeft = SettingsService.Get("BigOnLeft", "true") == "true";
+      _startupMinimized = SettingsService.Get("StartupMinimized", "false") == "true";
       _minimizeToTray = SettingsService.Get("MinimizeToTray", "false") == "true";
       _slotBig = SettingsService.Get("Slot_Big", "Daily");
       _slotSmallTop = SettingsService.Get("Slot_SmallTop", "Weekly");
@@ -106,6 +118,7 @@
       _customBackground = SettingsService.Get("Custom_Background", "#282C34");
       _customSurface = SettingsService.Get("Custom_Surface", "#21252B");
       LoadCustomColorValues();
+      await RefreshStartupSettingsAsync();
    }
 
    private void LoadCustomColorValues() {
@@ -152,6 +165,7 @@
       SettingsService.Set("Appearance", _appearance);
       SettingsService.Set("Theme", _themeName);
       SettingsService.Set("BigOnLeft", _bigOnLeft.ToString().ToLower());
+      SettingsService.Set("StartupMinimized", _startupMinimized.ToString().ToLower());
       SettingsService.Set("MinimizeToTray", _minimizeToTray.ToString().ToLower());
       SettingsService.Set("Slot_Big", _slotBig);
       SettingsService.Set("Slot_SmallTop", _slotSmallTop);
@@ -162,8 +176,25 @@
       SettingsService.Set("Custom_Background", _customBackground);
       SettingsService.Set("Custom_Surface", _customSurface);
 
+      await SaveStartupSettingsAsync();
       await PersistSplashThemeAsync();
       await OnSaved.InvokeAsync();
+   }
+
+   private async Task RefreshStartupSettingsAsync() {
+      _startupSettingsState = await StartupSettingsService.GetStateAsync();
+      _startWithWindows = _startupSettingsState.IsEnabled;
+      _lastStartWithWindows = _startWithWindows;
+   }
+
+   private async Task SaveStartupSettingsAsync() {
+      if (!_startupSettingsState.IsSupported || _startWithWindows == _lastStartWithWindows) {
+         return;
+      }
+
+      _startupSettingsState = await StartupSettingsService.SetEnabledAsync(_startWithWindows);
+      _startWithWindows = _startupSettingsState.IsEnabled;
+      _lastStartWithWindows = _startWithWindows;
    }
 
    private async Task PersistSplashThemeAsync() {

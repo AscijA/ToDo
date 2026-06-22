@@ -17,6 +17,7 @@
     <Project Path="ToDo.Maui.Android/ToDo.Maui.Android.csproj" Id="fddc9d9f-cfb8-4c51-bbc4-a0b84694d115">
       <Deploy Solution="*|Any CPU" />
     </Project>
+    <Project Path="ToDo.Maui.Native/ToDo.Maui.Native.csproj" />
     <Project Path="ToDo.Maui.Windows/ToDo.Maui.Windows.csproj" Id="e336e3b5-c47e-4f61-8fb8-526dfc8649e3">
       <Platform Solution="*|x64" Project="x64" />
       <Deploy Solution="*|Any CPU" />

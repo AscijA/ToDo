@@ -39,14 +39,16 @@
 	protected override async Task OnInitializedAsync() {
 		SyncDataRefresh.RefreshRequested += OnSyncDataRefreshRequested;
 		string savedDateStr = SettingsService.Get(DatePrefKey, string.Empty);
+		var today = DateOnly.FromDateTime(DateTime.Now);
 
 		if (!string.IsNullOrEmpty(savedDateStr) && DateOnly.TryParse(savedDateStr, out var parsedDate)) {
-			Date = parsedDate;
+			Date = parsedDate < today ? today : parsedDate;
 		}
 		else {
-			Date = DateOnly.FromDateTime(DateTime.Now);
+			Date = today;
 		}
 
+		SettingsService.Set(DatePrefKey, Date.ToString("yyyy-MM-dd"));
 		selectedDateTime = Date.ToDateTime(new TimeOnly(0, 0));
 
 		await LoadTasksAsync();
