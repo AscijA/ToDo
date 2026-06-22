@@ -54,15 +54,20 @@ jobs:
         $manifestPath = "${{ env.Wap_Project_Directory }}/Platforms/Windows/Package.appxmanifest"
         $targetVersion = "${{ steps.version_resolver.outputs.final_version }}.0"
         
-        # Read the raw content string
-        $content = Get-Content $manifestPath -Raw
+        # Read the file as an array of individual lines to safely isolate text matching
+        $lines = Get-Content $manifestPath
         
-        # Regex update targeting only the Version="X.X.X.X" string inside the <Identity /> node
-        $content = $content -replace '(<Identity\s+[^>]*Version=")[^"]*(")', "${1}$targetVersion${2}"
+        # Scan and replace only the line containing the Version string
+        for ($i = 0; $i -lt $lines.Count; $i++) {
+            if ($lines[$i] -match 'Version="\d+\.\d+\.\d+\.\d+"') {
+                $lines[$i] = $lines[$i] -replace 'Version="\d+\.\d+\.\d+\.\d+"', "Version=`"$targetVersion`""
+                break
+            }
+        }
         
-        # Save it back cleanly without re-encoding token properties
-        Set-Content $manifestPath $content -NoNewline
-        Write-Host "Successfully patched Package.appxmanifest Identity Version to: $targetVersion"
+        # Save it back with original formatting intact
+        Set-Content $manifestPath $lines
+        Write-Host "Successfully updated Package.appxmanifest line directly to target: $targetVersion"
 
     - name: Decode the PFX
       run: |
