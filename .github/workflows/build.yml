@@ -48,16 +48,21 @@ jobs:
         if ([string]::IsNullOrEmpty($version)) { $version = "${{ steps.nbgv.outputs.SimpleVersion }}" }
         echo "final_version=$version" >> $env:GITHUB_OUTPUT
 
-    # FIX: Patches the manifest directly inside the single reusable build block
     - name: Dynamically Patch AppxManifest Version
       shell: powershell
       run: |
         $manifestPath = "${{ env.Wap_Project_Directory }}/Platforms/Windows/Package.appxmanifest"
-        [xml]$xml = Get-Content $manifestPath
-        $targetVersion = "${{ steps.version_resolver.outputs.final_version }}"
-        $xml.Package.Identity.Version = "$targetVersion.0"
-        $xml.Save($manifestPath)
-        Write-Host "Successfully patched Package.appxmanifest internal Identity to: $targetVersion.0"
+        $targetVersion = "${{ steps.version_resolver.outputs.final_version }}.0"
+        
+        # Read the raw content string
+        $content = Get-Content $manifestPath -Raw
+        
+        # Regex update targeting only the Version="X.X.X.X" string inside the <Identity /> node
+        $content = $content -replace '(<Identity\s+[^>]*Version=")[^"]*(")', "${1}$targetVersion${2}"
+        
+        # Save it back cleanly without re-encoding token properties
+        Set-Content $manifestPath $content -NoNewline
+        Write-Host "Successfully patched Package.appxmanifest Identity Version to: $targetVersion"
 
     - name: Decode the PFX
       run: |
@@ -126,6 +131,7 @@ jobs:
         $keystorePath = Join-Path -Path $env:Wap_Project_Directory -ChildPath todo.keystore
         [IO.File]::WriteAllBytes("$keystorePath", $keystore_byte)
 
+    # FIXED: Corrected syntax token from $version_resolver to steps.version_resolver.outputs.final_version
     - name: Publish MAUI Android App
       run: dotnet publish ${{ env.Project_Path }} -c Release -f net10.0-android -p:AndroidKeyStore=true -p:AndroidSigningKeyStore=todo.keystore -p:AndroidSigningKeyAlias="todo_alias" -p:AndroidSigningKeyPass="${{ secrets.Pfx_Key }}" -p:AndroidSigningStorePass="${{ secrets.Pfx_Key }}" -p:SEMVER="${{ steps.version_resolver.outputs.final_version }}" -p:BUILD_NUMBER=${{ github.run_number }}
 
