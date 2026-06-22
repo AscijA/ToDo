@@ -38,7 +38,7 @@
         <uap:SplashScreen Image="$placeholder$.png" />
       </uap:VisualElements>
       <Extensions>
-        <desktop:Extension Category="windows.startupTask" Executable="$targetnametoken$.exe" EntryPoint="Windows.FullTrustApplication">
+        <desktop:Extension Category="windows.startupTask" Executable="ToDo.Maui.Windows.exe" EntryPoint="Windows.FullTrustApplication">
           <desktop:StartupTask TaskId="ToDoStartupTask" Enabled="false" DisplayName="To Do" />
         </desktop:Extension>
       </Extensions>
