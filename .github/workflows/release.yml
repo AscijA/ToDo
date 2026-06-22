@@ -106,5 +106,4 @@ jobs:
         fail_on_unmatched_files: true
         files: |
           ./release-assets/ToDo-Windows-v*.msix
-          ./release-assets/ToDo-Windows-v*.msixbundle
           ./release-assets/ToDo-Android-v*.apk
