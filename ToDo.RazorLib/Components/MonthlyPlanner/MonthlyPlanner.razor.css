@@ -9,7 +9,10 @@
 	border-top: 1px solid var(--mud-palette-lines-default);
 	display: grid;
 	grid-template-columns: repeat(7, minmax(0, 1fr));
+	grid-template-rows: max-content;
+	grid-auto-rows: 1fr;
 	width: 100%;
+	flex-grow: 1;
 }
 
 .monthly-calendar-weekday {
@@ -22,6 +25,7 @@
 	line-height: 1;
 	padding: 6px 2px;
 	text-align: center;
+	height:32px;
 }
 
 .monthly-calendar-day {
