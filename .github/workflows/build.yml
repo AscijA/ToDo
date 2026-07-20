@@ -167,8 +167,8 @@ jobs:
   build-ios:
     runs-on: macos-latest
     env:
-      Project_Path: ToDo.Maui.iOS/ToDo.Maui.iOS.csproj
-      Wap_Project_Directory: ToDo.Maui.iOS
+      Project_Path: ToDo.Maui.Android/ToDo.Maui.Android.csproj
+      Wap_Project_Directory: ToDo.Maui.Android
     steps:
     - name: Checkout
       uses: actions/checkout@v4
@@ -194,7 +194,7 @@ jobs:
         if [ -z "$VERSION" ]; then VERSION="${{ steps.nbgv.outputs.SimpleVersion }}"; fi
         echo "final_version=$VERSION" >> $GITHUB_OUTPUT
 
-    # Import P12 signing cert if provided in secrets, otherwise build unsigned for sideloading
+    # Imports certificate if supplied, otherwise builds unsigned
     - name: Import Apple Signing Certificate (If Secret Exists)
       if: env.IOS_P12_EXISTS != ''
       env:
@@ -204,7 +204,7 @@ jobs:
         p12-file-base64: ${{ secrets.IOS_P12_BASE64 }}
         p12-password: ${{ secrets.Pfx_Key }}
 
-    - name: Publish MAUI iOS App (Signed or Unsigned)
+    - name: Publish MAUI iOS App
       run: |
         IF_SIGNED_FLAG=""
         if [ -z "${{ secrets.IOS_P12_BASE64 }}" ]; then
