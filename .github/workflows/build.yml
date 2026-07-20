@@ -180,8 +180,9 @@ jobs:
       with:
         dotnet-version: 10.0.x
 
-    - name: Install MAUI iOS Workload
-      run: dotnet workload install maui-ios
+    # FIX: Restores ALL workloads required by the cross-platform .csproj (Android + iOS)
+    - name: Restore Project Workloads
+      run: dotnet workload restore ${{ env.Project_Path }}
 
     - name: Calculate Semantic Version
       uses: dotnet/nbgv@master
@@ -194,7 +195,6 @@ jobs:
         if [ -z "$VERSION" ]; then VERSION="${{ steps.nbgv.outputs.SimpleVersion }}"; fi
         echo "final_version=$VERSION" >> $GITHUB_OUTPUT
 
-    # Imports certificate if supplied, otherwise builds unsigned
     - name: Import Apple Signing Certificate (If Secret Exists)
       if: env.IOS_P12_EXISTS != ''
       env:
