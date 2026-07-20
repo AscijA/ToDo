@@ -54,7 +54,6 @@ jobs:
         echo "Resolved release version: $NEXT_VERSION"
         echo "next=$NEXT_VERSION" >> $GITHUB_OUTPUT
 
-  # CHANGED: Reuses the newly named build.yml file as the template function engine
   trigger-shared-builds:
     needs: calculate-version
     uses: ./.github/workflows/build.yml
@@ -83,6 +82,12 @@ jobs:
         name: android-binary
         path: ./release-assets
 
+    - name: Download iOS Binary
+      uses: actions/download-artifact@v4
+      with:
+        name: ios-binary
+        path: ./release-assets
+
     - name: Ensure Release Tag Does Not Exist
       run: |
         if git ls-remote --exit-code --tags origin "v${{ needs.calculate-version.outputs.next_version }}" >/dev/null 2>&1; then
@@ -101,9 +106,11 @@ jobs:
           
           * **Windows Installer:** `ToDo-Windows-v${{ needs.calculate-version.outputs.next_version }}.msix`
           * **Android Installer:** `ToDo-Android-v${{ needs.calculate-version.outputs.next_version }}.apk`
+          * **iOS Package:** `ToDo-iOS-v${{ needs.calculate-version.outputs.next_version }}.ipa`
         draft: false
         prerelease: false
         fail_on_unmatched_files: true
         files: |
-          ./release-assets/ToDo-Windows-v*.msix
+          ./release-assets/ToDo-Windows-v*
           ./release-assets/ToDo-Android-v*.apk
+          ./release-assets/ToDo-iOS-v*.ipa
